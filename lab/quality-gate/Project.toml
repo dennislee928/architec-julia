@@ -1,0 +1,4 @@
+[deps]
+Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
+JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
+LeanDemo = "7e1a9c42-3b8f-4d21-9c5a-2f6e8d104a77"

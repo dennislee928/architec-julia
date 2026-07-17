@@ -72,3 +72,25 @@ Julia 的 GC 實作位於 `/src/gc.c`。這是一個非精確（Imprecise）、�
 **無效化 × pkgimage 的乘法效應**：pkgimage 中的機器碼同樣受 §3.4 的無效化管轄 —— 若載入套件 B 無效化了套件 A 映像中的程式碼，A 花在預編譯的那部分工夫就白費了，還得在執行期重編譯。因此**減少無效化是讓兩層快取都保值的槓桿點**，這是 Phase 2 選擇它作為首要目標的技術依據。
 
 **延遲的陷阱**：套件擴充（Package Extensions，如 Plots 的 `FileIOExt`）是延遲預編譯的，可能在首次使用時才觸發編譯。實測中這造成 Plots TTFX 在 0.86 秒與 3.6 秒之間波動 —— 量測與優化時必須明確固定擴充套件的預編譯狀態。
+
+## 3.6 對策實證：六大精實原則的實作結果 (Countermeasures, Verified)
+
+本章機制（§3.1–3.5）對應的六項精實對策已於 2026-07-17 全數實作並量測
+（工件在 [`lab/`](../lab/)，完整數據在 [`lab/RESULTS.md`](../lab/RESULTS.md)）：
+
+- **避免冷啟動**（§3.5 的 Front-End Planning 極致版）：自訂 sysimage 將
+  Plots 使用者旅程由 7.1 秒壓至 0.65 秒（`using` 5,978 ms → 0.6 ms）。
+- **First-Run Study**：PrecompileTools workload 使首次呼叫 106.7 ms → 0.03 ms。
+  剩餘的 savefig ~644 ms 為 GR/FileIO 執行期初始化，非編譯成本 —— 量測區分
+  「編譯的浪費」與「必要的初始化」正是 First-Run Study 的目的。
+- **限制 WIP**（§3.2 裝箱成本的部署面）：juliac `--trim=safe` 產出 1.1 MB、
+  130 ms 啟動的獨立執行檔；對照組 sysimage 462 MB —— 靜態可達性分析
+  （Tree-shaking）將「過量庫存」削減三個數量級。
+- **品質左移**（§3.1 型別穩定性的閘門化）：JET + Aqua 三道閘（含閘門自我測試：
+  對反面教材必須報錯，否則視為閘門失效）；Aqua 曾實際攔截本 repo 的 compat
+  缺陷 —— 防呆機制的實證。
+- **漸進驗證 / 禁止 Big-Bang**：`lab/ci.sh` 三階段 fail-fast（靜態 → 單元 →
+  TTFX 預算制回歸），品質驗證分散於每個階段邊界。
+- **核心貢獻（Track A）**：§3.4 所述最大無效化樹的根因已定位於
+  `Compiler/src/inferencestate.jl:1312` × `REPLCompletions.jl:535`；
+  候選修法與驗證協定見 [`lab/core-experiment/TRACKA-DOSSIER.md`](../lab/core-experiment/TRACKA-DOSSIER.md)。

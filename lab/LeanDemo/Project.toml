@@ -1,0 +1,18 @@
+name = "LeanDemo"
+uuid = "7e1a9c42-3b8f-4d21-9c5a-2f6e8d104a77"
+authors = ["architec-julia"]
+version = "0.1.0"
+
+[deps]
+PrecompileTools = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
+
+[compat]
+julia = "1.10"
+PrecompileTools = "1"
+Test = "1"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]

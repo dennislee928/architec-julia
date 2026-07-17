@@ -1,9 +1,25 @@
 # architec-julia — Julia 核心貢獻任務基地
 
-本 repo 是「以精實建設（Lean Construction）框架改善 Julia 語言」的任務控制中心：
+本 repo 是「以精實建設（Lean Construction）框架改善 Julia 語言」的任務控制中心。
+四大痛點（TTFP 冷啟動、生態系規模、記憶體/執行檔膨脹、缺乏靜態防呆）×
+六大對策，已全數實作並量測（2026-07-17，Julia 1.12.6）：
 
-- **任務計畫與進度**：[`plan.md`](plan.md)（Track B → A：先生態系套件，後核心編譯器；首要目標 = TTFP 冷啟動）
-- **基準測量（First-Run Study）**：[`bench/`](bench/) — 冷預編譯 / 載入 / TTFX / 方法無效化基準，最新結果見 [`bench/results/baseline-2026-07-17.md`](bench/results/baseline-2026-07-17.md)
+| 精實對策 | 實作工件 | 實測結果 |
+|---|---|---|
+| 避免冷啟動 Front-End Planning | [`lab/sysimage/`](lab/sysimage/) | Plots 旅程 7.1 s → **0.65 s**（`using` 5,978 → 0.6 ms） |
+| 持續整合 First-Run Study | [`lab/LeanDemo/`](lab/LeanDemo/) + PrecompileTools | 首次呼叫 106.7 → **0.03 ms** |
+| 限制 WIP（Tree-shaking） | [`lab/small-binary/`](lab/small-binary/) juliac `--trim` | **1.1 MB** 執行檔、130 ms 啟動（對照 sysimage 462 MB） |
+| 品質左移 Poka-Yoke | [`lab/quality-gate/`](lab/quality-gate/) JET + Aqua | 三道閘全綠；曾實際攔截真實 compat 缺陷 |
+| 漸進驗證 + 禁止 Big-Bang | [`lab/ci.sh`](lab/ci.sh) | 靜態 → 單元 → 效能預算，fail-fast 全綠 |
+| 兩軌貢獻 Track B→A | [`plan.md`](plan.md) §4–5 | 4 個具名上游 PR 標的；core 根因已定位（[dossier](lab/core-experiment/TRACKA-DOSSIER.md)） |
+
+導覽：
+
+- **任務計畫與進度**：[`plan.md`](plan.md)（Track B → A；Phase 1–2.5 完成，Phase 3 進行中）
+- **基準測量**：[`bench/`](bench/) — 冷預編譯 / 載入 / TTFX / 方法無效化基準；
+  [基線報告](bench/results/baseline-2026-07-17.md) ·
+  [無效化樹](bench/results/toptrees-DataFrames.txt)
+- **對策實驗室**：[`lab/`](lab/) — 全部可重跑；彙總見 [`lab/RESULTS.md`](lab/RESULTS.md)
 - **參考文件**（Julia 內部研究筆記）：本文件（建置系統）、[`docs/STRUCTURE.md`](docs/STRUCTURE.md)、[`docs/IMPLEMENTATION.md`](docs/IMPLEMENTATION.md)、[`contribute.md`](contribute.md)
 
 ---
