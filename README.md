@@ -1,3 +1,13 @@
+# architec-julia — Julia 核心貢獻任務基地
+
+本 repo 是「以精實建設（Lean Construction）框架改善 Julia 語言」的任務控制中心：
+
+- **任務計畫與進度**：[`plan.md`](plan.md)（Track B → A：先生態系套件，後核心編譯器；首要目標 = TTFP 冷啟動）
+- **基準測量（First-Run Study）**：[`bench/`](bench/) — 冷預編譯 / 載入 / TTFX / 方法無效化基準，最新結果見 [`bench/results/baseline-2026-07-17.md`](bench/results/baseline-2026-07-17.md)
+- **參考文件**（Julia 內部研究筆記）：本文件（建置系統）、[`docs/STRUCTURE.md`](docs/STRUCTURE.md)、[`docs/IMPLEMENTATION.md`](docs/IMPLEMENTATION.md)、[`contribute.md`](contribute.md)
+
+---
+
 # 進階建置系統與底層依賴指南
 
 ## 1.1 專案概覽與系統架構 (Project Overview & Architecture)

@@ -28,7 +28,7 @@ for pkg in "${PACKAGES[@]}"; do
   julia --startup-file=no --project=bench -e "
     using Pkg
     for dir in Base.DEPOT_PATH
-        cache = joinpath(dir, \"compiled\", \"v$(VERSION.major).$(VERSION.minor)\", \"$pkg\")
+        cache = joinpath(dir, \"compiled\", \"v\$(VERSION.major).\$(VERSION.minor)\", \"$pkg\")
         isdir(cache) && rm(cache; recursive=true)
     end
     t = @elapsed Pkg.precompile(\"$pkg\")

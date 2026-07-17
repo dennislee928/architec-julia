@@ -1,8 +1,14 @@
 # Implementation Plan (v4 — FINAL, post-grill)
 
-> Status: **APPROVED** — scoped with the owner on 2026-07-17 over two review rounds.
-> v2 (docs-site) was rejected as a misread of the goal; v3's open questions were
-> answered in round 2. This is the executing plan.
+> Status: **Phase 1 COMPLETE (2026-07-17)** — baseline harness built and run; see
+> `bench/results/baseline-2026-07-17.md`. Key numbers (Julia 1.12.6, Apple Silicon):
+> cold precompile CSV 18 s / DataFrames 45 s / Plots 55 s; load 1.2 / 2.1 / 4.6 s;
+> TTFX ≤ 0.9 s; invalidations 973 / 1262 / 1539. Conclusion: on 1.12 the start-up
+> loss lives in **precompilation and invalidation rework**, not runtime TTFX.
+> Phase 2 target: invalidation-reduction PRs (DataFrames/Plots trees first).
+>
+> Scoped with the owner on 2026-07-17 over two review rounds. v2 (docs-site) was
+> rejected as a misread of the goal; v3's open questions were answered in round 2.
 
 ## 1. Mission
 
