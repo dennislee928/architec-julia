@@ -15,7 +15,7 @@ on:
         required: true
         default: "JuliaLang/julia"
       julia_ref:
-        description: "Branch / ref to build (e.g. fix-absint-invalidation)"
+        description: "Branch/ref to build — NOTE: julia's default branch is `master`, not `main`"
         required: true
         default: "master"
 
@@ -24,6 +24,22 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 350
     steps:
+      - name: Validate repo/ref before the expensive part (fail fast)
+        run: |
+          if ! git ls-remote --exit-code "https://github.com/${{ inputs.julia_repo }}" \
+              "refs/heads/${{ inputs.julia_ref }}" "refs/tags/${{ inputs.julia_ref }}"; then
+            echo "::error::ref '${{ inputs.julia_ref }}' not found on ${{ inputs.julia_repo }}."
+            echo "::error::julia's default branch is 'master' (not 'main'); for a fork pass your feature branch name."
+            echo "Available heads (first 20):"
+            git ls-remote --heads "https://github.com/${{ inputs.julia_repo }}" | head -20
+            exit 1
+          fi
+
+      - name: Free runner disk space (julia build needs ~20 GB)
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
       - name: Checkout Julia source
         uses: actions/checkout@v4
         with:
