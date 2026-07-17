@@ -42,8 +42,9 @@ Interpretation:
    but larger refactor: the natural upstream conversation is "should Compiler
    read AbstractInterpreter interface values through the inference state?", with
    this branch + these measurements as the evidence.
-3. Correctness: `make test-compiler` run on the patched build (see
-   `~/Documents/GitHub/julia/test-compiler.log`).
+3. Correctness: **`make test-compiler` SUCCESS on the patched build** —
+   539,410 passed / 0 failed / 50 known-broken in 9m22s, including the
+   `Compiler/AbstractInterpreter` testset (the exact interface touched).
 
 Branch: `avoid-absint-interface-invalidation` @ `2dbb8d9` (DCO signed) in
 `~/Documents/GitHub/julia`.
