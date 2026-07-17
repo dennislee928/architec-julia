@@ -1,8 +1,9 @@
 # 編譯管線、LLVM 轉譯與 GC 實作
 
 > 任務脈絡：本文件對應 [`plan.md`](../plan.md) 的三大痛點根源 —— §3.1 型別推斷
-> 決定 TTFP 與無效化（invalidation）行為（見 `bench/invalidations.jl` 的量測），
-> §3.2 裝箱/拆箱決定記憶體 WIP，§3.1 的型別穩定性正是 JET.jl「品質左移」檢查的對象。
+> 決定 TTFP 行為，§3.2 裝箱/拆箱決定記憶體 WIP，型別穩定性正是 JET.jl「品質左移」
+> 檢查的對象；§3.4 方法無效化與 §3.5 預編譯/pkgimages 是 Phase 2 實戰的直接機制，
+> 並以 `bench/` 的實測數據佐證。
 
 這份文件將深入解剖 Julia 最核心的兩個技術命脈：即時編譯器（JIT Compiler）的優化管線與記憶體管理系統（Garbage Collector）。
 
@@ -45,3 +46,29 @@ Julia 的 GC 實作位於 `/src/gc.c`。這是一個非精確（Imprecise）、�
 - **解決方案**：C++ 原始碼中充滿了 `jl_gc_wb(parent, child)`（Write Barrier）巨集。每次修改指標前，必須觸發這個屏障，通知 GC 記錄這種「老指新」的跨世代引用。
 
 **C 語言層的 GC 根物件保護 (JL_GC_PUSH)**：在編寫 /src 中的 C 程式碼時，任何指向 `jl_value_t*` 的本地變數都對 GC 是隱形的。如果你配置了一個物件，然後呼叫了可能觸發 GC 的函數，該物件可能會在函數返回前被意外回收。開發者必須嚴格遵守紀律，使用 `JL_GC_PUSH1(&my_val)` 將變數註冊到 GC 的 Root 堆疊中，並在使用完畢後呼叫 `JL_GC_POP()`。未遵守此規範是 Julia 核心 Segfault 最常見的來源。
+
+## 3.4 世界年齡與方法無效化 (World Age & Method Invalidation)
+
+這是本任務 Phase 2 的核心機制。Julia 允許在執行期新增或覆寫方法（Method），但已編譯的機器碼是基於「當時看得見的方法表」生成的 —— 兩者如何共存？答案是「世界年齡（World Age）」機制，實作於 `/src/gf.c`（generic functions）。
+
+**世界年齡計數器**：每次有方法被定義或刪除，全域的 world counter 就會 +1。每個 `MethodInstance` 編譯出的程式碼都帶有一個有效區間 `[min_world, max_world]`。執行中的 Task 固定在進入時的 world 中執行，因此看不見「未來」定義的方法 —— 這就是 REPL 中重新定義函數後，舊的執行緒不會突然改變行為的原因。
+
+**反向邊 (Backedges)**：當推斷引擎（§3.1）在編譯 `f` 時內聯或靜態派發了 `g`，它會在 `g` 的 MethodInstance 上登記一條指回 `f` 的 backedge。日後若有新方法插入，使得 `g` 的派發結果**可能**改變（新方法的簽名與 `g` 被呼叫時的抽象簽名有交集），Runtime 便沿著 backedges 把 `f` 以及所有依賴 `f` 的已編譯程式碼全部標記為無效（將其 `max_world` 封頂）—— 下次呼叫時必須重新推斷、重新編譯。這就是「無效化（Invalidation）」：**已完成的編譯工作被追溯作廢的重工（Rework）**。
+
+**為何抽象呼叫最脆弱**：無效化幾乎總是發生在型別不穩定的呼叫點。若 `f` 中對 `convert(String, x::Any)` 或 `values(d::AbstractDict)` 這類**抽象簽名**做了呼叫，任何套件只要新增一個 `convert(::Type{String}, ::自家型別)` 方法，就會與該抽象簽名交集而引爆整棵無效化樹。本 repo 的實測（`bench/toptrees.jl`，2026-07-17，Julia 1.12.6）：
+
+- 載入 CSV / DataFrames / Plots 分別無效化 973 / 1262 / 1539 個方法。
+- 最大單一樹：REPL 的 `Compiler.InferenceParams(::REPLInterpreter)` 觸發 `Compiler.get_max_methods` 一節就有 396 個 children。
+- 生態系典型案例：`JSON.PtrString` 的 `convert(::Type{String}, ...)`、`SentinelArrays.ChainedVectorIndex` 的整數建構子、`DataStructures.values(::Accumulator)` 打掉 `PrettyTables._preprocess_data(::AbstractDict)` 210 個 children。
+
+**診斷與修復工具鏈**：`SnoopCompileCore.@snoop_invalidations`（量測，先載入以免污染）→ `SnoopCompile.invalidation_trees`（歸因）→ 修復手段依序為：在被害呼叫點加上具體型別標註（消除抽象呼叫）、調整新方法的簽名特異性、或以函數屏障（Function Barrier）隔離不穩定區段。修復效果可直接用本 repo 的 `bench/` 驗證。
+
+## 3.5 預編譯與套件映像 (Precompilation & pkgimages)
+
+**兩層快取**：自 Julia 1.9 起，`Pkg.precompile` 產出的不只是序列化的推斷結果（`.ji` 檔），還包含**原生機器碼**的套件映像（pkgimage，本質上是每個套件自己的迷你 `sys.so`）。這使得「首次執行」的成本大幅移出執行期：本 repo 實測第一次繪圖（TTFX）僅 0.86 秒，而歷史上這個數字是 10–30 秒。
+
+**成本守恆，位置轉移**：機器碼不會憑空出現 —— 生成成本移到了預編譯階段。實測冷預編譯：CSV 18 秒、DataFrames 45 秒、Plots 55 秒（首次建置環境 180 個相依套件共 270 秒）。以精實術語說：執行期的 Start-up Loss 被「前置計畫（Front-End Planning）」搬到了動員階段，而動員階段本身現在成了 WIP 堆積地。這正是 Phase 2 之後「預編譯時間削減」（`@snoop_inference` 分析）作為備選方向的原因。
+
+**無效化 × pkgimage 的乘法效應**：pkgimage 中的機器碼同樣受 §3.4 的無效化管轄 —— 若載入套件 B 無效化了套件 A 映像中的程式碼，A 花在預編譯的那部分工夫就白費了，還得在執行期重編譯。因此**減少無效化是讓兩層快取都保值的槓桿點**，這是 Phase 2 選擇它作為首要目標的技術依據。
+
+**延遲的陷阱**：套件擴充（Package Extensions，如 Plots 的 `FileIOExt`）是延遲預編譯的，可能在首次使用時才觸發編譯。實測中這造成 Plots TTFX 在 0.86 秒與 3.6 秒之間波動 —— 量測與優化時必須明確固定擴充套件的預編譯狀態。

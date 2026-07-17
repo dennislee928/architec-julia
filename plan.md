@@ -5,7 +5,10 @@
 > cold precompile CSV 18 s / DataFrames 45 s / Plots 55 s; load 1.2 / 2.1 / 4.6 s;
 > TTFX ≤ 0.9 s; invalidations 973 / 1262 / 1539. Conclusion: on 1.12 the start-up
 > loss lives in **precompilation and invalidation rework**, not runtime TTFX.
-> Phase 2 target: invalidation-reduction PRs (DataFrames/Plots trees first).
+>
+> **Phase 2 target selection COMPLETE (2026-07-17)** — invalidation trees analyzed
+> (`bench/toptrees.jl`); four named PR candidates in §4, starting with JSON.jl's
+> `PtrString` conversions. Next action: check upstream issues, then branch and fix.
 >
 > Scoped with the owner on 2026-07-17 over two review rounds. v2 (docs-site) was
 > rejected as a misread of the goal; v3's open questions were answered in round 2.
@@ -49,16 +52,26 @@ Build `bench/` in this repo:
 5. **Report**: `bench/results/baseline-2026-07-17.md` with tables + interpretation
    through the lean lens (where the start-up loss actually is).
 
-## 4. Phase 2 (next): pick and ship the first upstream PR
+## 4. Phase 2: ship the first upstream PR — targets selected (2026-07-17)
 
-From baseline data, choose one:
-- A PrecompileTools.jl workload PR to a package the data shows is
-  under-precompiled, or
-- an invalidation-reduction PR (guided by `@snoop_invalidations` output), or
-- a JET.jl/Aqua.jl rule if Phase 1 surfaces a type-instability pattern.
+Invalidation-tree analysis ran via `bench/toptrees.jl` (full output in
+`bench/results/toptrees-{DataFrames,Plots}.txt`). Concrete candidates, ranked by
+fit for a first PR (small, pure Julia, measurable):
 
-Follow `contribute.md` discipline: feature branch, atomic commits, DCO sign-off,
-targeted tests, benchmark before/after.
+| # | Trigger (package to patch) | Damage | Fix shape |
+|---|---|---|---|
+| 1 | `JSON.PtrString`: `convert(::Type{String}, x::PtrString)` and `convert(::Type{Symbol}, ...)` (JSON.jl) | 2 of Plots' top-5 trees | Trigger methods intersect abstract `convert` signatures compiled in Base; narrow the callers or precompile-protect — classic SnoopCompile fix |
+| 2 | `SentinelArrays.ChainedVectorIndex`: `(::Type{T})(x::ChainedVectorIndex) where T<:Union{Signed,Unsigned}` | ~180 children across `Tuple{Type{Int64}, Integer}` backedges (incl. `Array` ctor, 48) | New integer constructor invalidates `Integer`-typed call sites; consider `convert` specificity or annotate hot Base callers |
+| 3 | `DataStructures.values(::Accumulator)` → `PrettyTables._preprocess_data(::AbstractDict)` | 210 children | Type-annotate/concretize `_preprocess_data` in PrettyTables so `values(::AbstractDict)` isn't a vulnerable abstract call |
+| 4 | `REPL.REPLCompletions`: `Compiler.InferenceParams(::REPLInterpreter)` | Largest tree in BOTH packages (`get_max_methods` alone: 396 children) | **Track A (Julia stdlib)** — deferred to Phase 3; check JuliaLang/julia issue tracker first, likely known |
+
+**Execution order**: start with #1 (JSON.jl — smallest surface, clear reproduction,
+active maintainers), then #3 (PrettyTables). #4 is the Phase 3 core on-ramp.
+
+**Acceptance criteria per PR**: (a) upstream issue checked/opened first;
+(b) `bench/toptrees.jl` shows the tree eliminated or reduced ≥ 80% with the patched
+package `Pkg.develop`ed; (c) no TTFX regression in `bench/run.sh`; (d) follows
+`contribute.md` discipline: feature branch, atomic commits, DCO sign-off, tests.
 
 ## 5. Phase 3 (later): graduate to core (Track A)
 
