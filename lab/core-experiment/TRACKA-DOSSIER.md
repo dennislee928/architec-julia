@@ -1,8 +1,22 @@
 # Track A Dossier — REPL 載入引發編譯器自我無效化 (2026-07-17)
 
-Status: root cause located in core source; candidate fixes assessed; empirical
-validation blocked on the local core build (in progress at
-`~/Documents/GitHub/julia`, `make -j8`).
+Status (updated 2026-07-18): **fix D1 implemented and committed**; validation
+rebuild in progress.
+
+- Local build of stock master completed: `1.14.0-DEV`, `usr/bin/julia` works.
+- **Stock-master baseline measured**: `using REPL` invalidates **758 methods
+  across 9 trees**; top trees are exactly the REPLCompletions interface
+  extensions (`InferenceParams`, `get_inference_world`, `abstract_eval_globalref`)
+  — root cause confirmed on master, not just 1.12.6.
+- **D1 patch applied** on branch `avoid-absint-interface-invalidation`
+  (commit `2dbb8d9`, DCO signed): cache `max_methods::Int` in
+  `InferenceState`/`IRInterpretationState` at construction (constructor
+  specializes on the concrete interpreter type); `get_max_methods(interp, sv)`
+  reads the cached field — removing the vulnerable abstract
+  `InferenceParams(interp)` callsite from hot abstract-interpretation paths.
+  Patched `Compiler` package compiles and loads.
+- Next: incremental `make` rebuild → re-measure `using REPL` invalidations →
+  compare vs 758/9 → `make test-compiler`.
 
 ## 1. Measured symptom (this repo's harness)
 
