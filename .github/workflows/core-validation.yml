@@ -1,0 +1,67 @@
+# Track A 雲端驗證管線 — 在 GitHub Actions 上編譯（可能帶補丁的）Julia core，
+# 並量測「載入 DataFrames 觸發的方法無效化」，與本地基線比對。
+#
+# 用法：把本 repo 推上 GitHub 後，於 Actions 頁面手動觸發（workflow_dispatch），
+# 指定要驗證的 julia repo（你的 fork）與 branch/ref。
+# Julia 完整編譯在 ubuntu-latest 約 1.5–2.5 小時，仍在 6 小時上限內；
+# 本地 Apple Silicon `make -j8` 約 40–90 分鐘 — 短迭代用本地，長驗證用這裡。
+name: core-invalidation-validation
+
+on:
+  workflow_dispatch:
+    inputs:
+      julia_repo:
+        description: "Julia repo to build (e.g. your fork: username/julia)"
+        required: true
+        default: "JuliaLang/julia"
+      julia_ref:
+        description: "Branch / ref to build (e.g. fix-absint-invalidation)"
+        required: true
+        default: "master"
+
+jobs:
+  build-and-measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - name: Checkout Julia source
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.julia_repo }}
+          ref: ${{ inputs.julia_ref }}
+          path: julia
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential gfortran perl python3 m4 cmake pkg-config curl
+
+      - name: Build Julia (binary deps via BinaryBuilder)
+        working-directory: julia
+        run: make -j"$(nproc)"
+
+      - name: Measure invalidations on package load
+        working-directory: julia
+        run: |
+          ./usr/bin/julia --startup-file=no -e '
+            using Pkg
+            Pkg.activate(; temp=true)
+            Pkg.add(["SnoopCompileCore", "SnoopCompile", "DataFrames"])
+            using SnoopCompileCore
+            invs = @snoop_invalidations @eval using DataFrames
+            using SnoopCompile
+            trees = invalidation_trees(invs)
+            open("../invalidation-report.txt", "w") do io
+                println(io, "unique invalidated methods: ", length(uinvalidated(invs)))
+                println(io, "invalidation trees: ", length(trees))
+                for t in trees[max(1, end - 9):end]
+                    show(io, t); println(io, "\n", "-"^70)
+                end
+            end
+            println(read("../invalidation-report.txt", String))'
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: invalidation-report-${{ inputs.julia_ref }}
+          path: invalidation-report.txt
