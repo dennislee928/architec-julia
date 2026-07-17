@@ -71,6 +71,13 @@ the local core build.
 `bench/invalidations.jl DataFrames` against `usr/bin/julia` → compare tree count
 and children vs the 2026-07-17 baseline; then `make test-compiler`.
 
+**Cloud validation path**: `.github/workflows/core-validation.yml`
+(repo: `dennislee928/architec-julia`) builds any julia fork/branch on GitHub
+Actions (~1.5–2.5 h) and uploads an invalidation report artifact — use it for
+long validation runs; local Apple Silicon `make -j8` for short iterations.
+Note: julia's default branch is `master`, not `main` (first run failed on this;
+the workflow now fails fast with a clear message on a bad ref).
+
 ## 5. Upstream etiquette
 
 Before any PR: search JuliaLang/julia issues/PRs for existing work on
