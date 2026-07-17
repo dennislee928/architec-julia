@@ -1,68 +1,66 @@
-# Implementation Plan (v2 — finalized after owner review)
+# Implementation Plan (v4 — FINAL, post-grill)
 
-> Status: **APPROVED SCOPE** — v1 assumptions were reviewed with the project owner
-> on 2026-07-17. Decisions recorded in §2.
+> Status: **APPROVED** — scoped with the owner on 2026-07-17 over two review rounds.
+> v2 (docs-site) was rejected as a misread of the goal; v3's open questions were
+> answered in round 2. This is the executing plan.
 
-## 1. Project goal
+## 1. Mission
 
-Build a **bilingual (繁體中文 + English) documentation site** that serves as an
-onboarding guide for developers who want to **contribute to the Julia language core**
-(runtime, compiler, GC, build system). The four existing zh-TW documents are the
-seed content.
+Contribute to and refine the **Julia language**, using the owner's
+lean-construction framework as the guiding theory:
 
-## 2. Decisions from owner review
+| Julia pain point | Lean analogue | Countermeasure |
+|---|---|---|
+| TTFP / JIT cold start | Mobilization & ramp-up loss | Front-End Planning: precompilation, system images, invalidation reduction |
+| Memory / binary bloat | Excess inventory / WIP | Tree-shaking, dead-code elimination, WIP caps |
+| Runtime-only error discovery | End-of-line inspection | Shift-left: static analysis (JET/Aqua), Poka-Yoke checks |
+
+## 2. Decisions (grill round 2, 2026-07-17)
 
 | Question | Decision |
 |---|---|
-| Deliverable | Documentation site (static, with nav + search) |
-| Content focus | Contributing to Julia core / compiler internals (no toy demos) |
-| Languages | Bilingual: Traditional Chinese (primary) + English |
-| Constraints | Free rein: may rename/move files, add tooling, init git |
+| Track | **B → A ramp**: ecosystem packages first (pure Julia), graduate to core/compiler later |
+| First pain point | **TTFP / cold start** |
+| Skill posture | Learning both Julia internals and C++/LLVM → prefer small, well-scoped, mentorable targets |
+| First deliverable | **Benchmark baseline harness** ("First-Run Study"), then choose the upstream PR target from data |
 
-## 3. Architecture
+## 3. Phase 1 (this session): TTFP baseline harness
 
-- **Generator**: MkDocs + Material theme + `mkdocs-static-i18n` plugin.
-  - Installed in a project-local `.venv` (no global pollution).
-  - Markdown remains the source of truth → low-friction bilingual maintenance.
-  - Material provides client-side search and a language switcher out of the box.
-- **i18n layout**: suffix convention — `page.md` (zh-TW, default locale) and
-  `page.en.md` (English) side by side.
+Build `bench/` in this repo:
 
-## 4. Target repository layout
+1. **`bench/ttfx.jl`** — measures, per target package:
+   - fresh-precompile time (`Pkg.precompile` after cache purge = true cold mobilization)
+   - `@time using X` load time (cold vs. warm process)
+   - time-to-first-execute of a representative call (TTFX)
+2. **`bench/invalidations.jl`** — uses `SnoopCompileCore.@snoop_invalidations` to
+   count method invalidations triggered by loading each target package (start-up
+   loss root cause in Julia ≥1.9's pkgimage world).
+3. **`bench/run.sh`** — orchestrates cold/warm runs in separate processes (JIT state
+   is per-process, so warm ≠ same-process rerun) and writes
+   `bench/results/baseline-<date>.md`.
+4. **Target packages** (small→large TTFX ladder): `CSV`, `DataFrames`, `Plots`
+   (the canonical "time to first plot" case).
+5. **Report**: `bench/results/baseline-2026-07-17.md` with tables + interpretation
+   through the lean lens (where the start-up loss actually is).
 
-```
-architec-julia/
-├── README.md              # project purpose, quick start (bilingual)
-├── CONTRIBUTING.md        # how to contribute to THIS docs project
-├── plan.md                # this file
-├── mkdocs.yml             # site config (theme, i18n, nav)
-├── requirements.txt       # mkdocs deps, pinned
-├── .gitignore             # .venv/, site/
-└── docs/
-    ├── index.md / index.en.md                  # landing page
-    ├── 01-build-system.md / .en.md             # from old readme.md
-    ├── 02-structure.md / .en.md                # from old docs/STRUCTURE.md
-    ├── 03-implementation.md / .en.md           # from old docs/IMPLEMENTATION.md
-    └── 04-contributing-to-julia.md / .en.md    # from old contribute.md
-```
+## 4. Phase 2 (next): pick and ship the first upstream PR
 
-## 5. Work items
+From baseline data, choose one:
+- A PrecompileTools.jl workload PR to a package the data shows is
+  under-precompiled, or
+- an invalidation-reduction PR (guided by `@snoop_invalidations` output), or
+- a JET.jl/Aqua.jl rule if Phase 1 surfaces a type-instability pattern.
 
-1. **Reorganize**: move the four docs into the numbered chapter layout above;
-   the old `readme.md` / `contribute.md` are replaced by proper repo-level
-   `README.md` / `CONTRIBUTING.md`.
-2. **Translate**: produce full English versions of all four chapters
-   (technical translation, keeping Julia/LLVM terminology exact).
-3. **Site build**: `mkdocs.yml` with Material theme, static-i18n (zh-TW default,
-   en secondary), navigation, search; verify `mkdocs build` passes cleanly.
-4. **New repo docs**: bilingual `README.md` (what this project is, how to build
-   the site) and `CONTRIBUTING.md` (style rules for both languages, how to add
-   a chapter).
-5. **Git**: `git init` + clean initial commit.
-6. **Verify**: build the site and inspect the rendered output for both locales.
+Follow `contribute.md` discipline: feature branch, atomic commits, DCO sign-off,
+targeted tests, benchmark before/after.
 
-## 6. Out of scope
+## 5. Phase 3 (later): graduate to core (Track A)
 
-- Toy/demo code implementations (explicitly dropped in review).
-- Hosting/deployment (GitHub Pages CI can be a follow-up).
-- New chapters beyond the existing four.
+Set up a `JuliaLang/julia` source build with `Make.user`
+(`WITH_CCACHE=1`, debug build) per `readme.md`, and target method-invalidation /
+startup-latency issues in core.
+
+## 6. Role of this repo
+
+Mission control: reference docs (`readme.md`, `docs/`, `contribute.md`), this plan,
+the benchmark harness, and result logs. Not a docs-site project.
