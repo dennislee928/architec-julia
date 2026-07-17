@@ -1,1 +1,4 @@
 julia_version,package,precompile_s,load_s,ttfx_s,invalidated_methods,invalidation_trees
+1.12.6,CSV,16.843,1.185,0.017,973,33
+1.12.6,DataFrames,45.416,2.217,0.053,1262,51
+1.12.6,Plots,67.501,5.002,1.200,1539,58

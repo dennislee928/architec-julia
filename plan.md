@@ -99,6 +99,21 @@ Pain-point coverage: TTFP ✅ (sysimage + workloads) · memory/binary bloat ✅ 
 · static-quality ✅ (JET/Aqua gate) · ecosystem ✅ (upstream targets §4 + this repo's
 harness as contribution evidence).
 
+## 5a. Phase 3 update (2026-07-18): first core patch built and validated
+
+- Stock master built locally (`1.14.0-DEV`); baseline: `using REPL` invalidates
+  **758 methods / 9 trees** — root cause confirmed on master.
+- **Fix D1 implemented, committed (DCO), rebuilt, measured**: branch
+  `avoid-absint-interface-invalidation` @ `2dbb8d9`. Result: `get_max_methods`
+  victim (396-children cascade on 1.12.6) **eliminated**; all remaining
+  `InferenceParams`-tree victims have **0 children**. Headline total (750 vs 758)
+  awaits the same treatment for the sibling trees (`get_inference_world`,
+  `abstract_eval_globalref`) — the systematic refactor is the upstream
+  conversation, with this branch as evidence. Details:
+  `lab/core-experiment/TRACKA-DOSSIER.md` §6.
+- Cloud validation: `.github/workflows/core-validation.yml` on
+  `dennislee928/architec-julia` (note: julia's default branch is `master`).
+
 ## 5. Phase 3 (STARTED 2026-07-17): graduate to core (Track A)
 
 - `JuliaLang/julia` cloned to `~/Documents/GitHub/julia`; `make -j8` build running.

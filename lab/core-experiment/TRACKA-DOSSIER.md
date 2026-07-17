@@ -18,6 +18,36 @@ rebuild in progress.
 - Next: incremental `make` rebuild → re-measure `using REPL` invalidations →
   compare vs 758/9 → `make test-compiler`.
 
+## 6. Validation results (2026-07-18, patched build)
+
+**Mechanism validated; headline total needs the systematic follow-up.**
+
+| Metric | Stock master | Patched (D1) |
+|---|---|---|
+| `using REPL` unique invalidated methods | 758 | 750 |
+| `get_max_methods` in the `InferenceParams` tree | victim with huge cascade (396 children on 1.12.6) | **eliminated** |
+| Children per victim in the `InferenceParams` tree | large cascades | **0 for every remaining victim** |
+
+Interpretation:
+
+1. **The pattern works**: moving the interface read into the concretely-specialized
+   state constructor removed the `get_max_methods` victim entirely and collapsed
+   the `InferenceParams` tree's cascade to zero-children leaves (the survivors are
+   shallow `typeinf_edge` / `abstract_call_method` / `builtin_tfunction` instances
+   that read *other* `InferenceParams(interp)` fields directly).
+2. **Why the total barely moved**: the remaining bulk sits in the sibling trees of
+   the same class — `get_inference_world(::REPLInterpreter)` and
+   `abstract_eval_globalref` — which need the identical treatment (cache the
+   interface-derived values in the state at construction). This is a mechanical
+   but larger refactor: the natural upstream conversation is "should Compiler
+   read AbstractInterpreter interface values through the inference state?", with
+   this branch + these measurements as the evidence.
+3. Correctness: `make test-compiler` run on the patched build (see
+   `~/Documents/GitHub/julia/test-compiler.log`).
+
+Branch: `avoid-absint-interface-invalidation` @ `2dbb8d9` (DCO signed) in
+`~/Documents/GitHub/julia`.
+
 ## 1. Measured symptom (this repo's harness)
 
 Loading **any** of CSV / DataFrames / Plots in a fresh Julia 1.12.6 process
