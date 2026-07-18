@@ -7,6 +7,15 @@
 > 雲端 A/B 對照：`.github/workflows/core-validation.yml` 一鍵輸出 baseline vs patched 改善幅度表。
 > **A4 上游提交完成（2026-07-18）**：PR 已開 → **JuliaLang/julia#62421**（5 commits, MERGEABLE），
 > 官方 CI 進行中；已於內文請求維護者觸發 @nanosoldier。
+> **A4 後續（2026-07-18 晚）**：PR 於 13:44 UTC 被維護者**關閉**（adienes：需更多
+> 人工論證而非 AI 輸出；KristofferC：認為 #61714 已部分處理此問題）。
+> CI Build #542 的兩個紅燈（macOS + i686 `test/misc.jl` interrupt 測試）經 triage
+> 確認**與本分支無關**（upstream 新增之 flaky signal 測試）→ 詳見
+> [ci-triage-build542.md](ci-triage-build542.md)。下一步屬策略決策：
+> (a) 以人工撰寫的機制論證回應並請求 reopen；(b) 對照 #61714 重新量測價值主張 — 注意 #61714 於 2026-05-29 即已 merge，
+> 本系列的 baseline 758（含 −20.7% 改善）量測於 2026-07 的 master，**已包含**
+> #61714 的效果，故兩者互補而非重複，此為 reopen 論證的核心事實；
+> (c) 上游回報 flaky test（草稿已備）。
 > 定位：Track B 已止血（把成本搬走/預付）；本計畫在 core 拔除根源。
 
 ## 0. 依據（已驗證的事實）
