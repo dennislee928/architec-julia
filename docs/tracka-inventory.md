@@ -48,6 +48,19 @@
   參數化設計記入上游 issue。
 - **系列總成效**（`using REPL`，macOS）：**758 → 648 unique invalidated（−14.5%）**，
   9 → 8 trees；殘餘為無 state 可用的入口類（見 §2 (b) 欄）。
+- **A2 PR-5**：`0b61fc1`（DCO）✅ — 無狀態殘餘的「傳遞 state」重構：
+  `edge_matches_sv`/`is_same_frame` 改用當前 state 的快取欄位、
+  `force_const_prop(sv,...)`、`find_method_matches` 呼叫端顯式傳
+  `max_union_splitting`、`builtin_tfunction` 經 sv 讀參數、
+  `abstract_eval_partition_load(assume_static::Bool,...)`（scan_leaf_partitions
+  callers 以閉包捕獲布林）、`code_cache(sv)`/`is_nonoverlayed(sv)`/`engine_reserve`
+  經 caller 快取。途中教訓：以「函數參考」傳遞的呼叫端
+  （`scan_leaf_partitions(abstract_eval_partition_load, ...)`）grep 加括號會漏抓，
+  bootstrap MethodError 抓到。
+- **PR-5 量測**：**648 → 601（自 stock 累計 −20.7%）**；
+  `InferenceParams` 樹直接受害者 18 → **2**（= 建構子實例，設計下限）、
+  `cache_owner` 樹**整棵消失**、world 樹 13 → 9（入口/建構子類）。
+  介面樹的可消除受害者至此**全數清除**。
 
 ## 4. 量測指令（重跑本盤點）
 

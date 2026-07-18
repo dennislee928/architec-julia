@@ -136,6 +136,30 @@ this data. All other 550k+ compiler tests pass on the patched builds.
 same `codegen.jl:119` flaky race**; every other testset passes, including
 `Compiler/AbstractInterpreter` (725 s), inference, inline, and verifytrim.
 
+## 12. PR-5: no-state residuals eliminated (2026-07-18)
+
+Commit `0b61fc1` (DCO): state-passing refactor for the callsites without a
+state in scope — the residual class identified in §9. Measured series now:
+
+| Build | Unique invalidated | InferenceParams victims | world victims | cache_owner tree |
+|---|---:|---:|---:|---|
+| Stock master | 758 | large cascades | ~130 class | present |
+| D1+PR-2 | 750/751 | 66 | 19 | present |
+| +PR-1ext/PR-3 | 648 | 18 | 13 | 8 victims |
+| **+PR-5** | **601 (−20.7% total)** | **2 (= ctor floor)** | **9 (entry/ctor)** | **eliminated** |
+
+Every eliminable interface-tree victim is now gone: the remaining direct
+victims are the 4 state-constructor instances (the designed cost floor of the
+caching pattern — one interface read per state construction) plus the
+genuinely stateless entry points (`typeinf_ext`, `compile!`, `_return_type`).
+Eliminating those would require redesigning the AbstractInterpreter entry
+contract itself — that is the upstream design conversation, now with a
+complete measurement ladder as evidence.
+
+Lesson: callsites passing the function *by reference*
+(`scan_leaf_partitions(abstract_eval_partition_load, …)`) are invisible to
+paren-suffixed greps; the bootstrap MethodError caught it.
+
 ## 11. Branch hygiene note
 
 The original branch accidentally tracked local build logs (`git add -A` during
