@@ -174,6 +174,23 @@ merge vs. the pre-fix measure comes from `concrete_eval_eligible` folding in).
 Branch tip: `9b96794` on `dennislee928/julia @ avoid-absint-interface-invalidation`
 (5 atomic DCO commits).
 
+## 13. Upstream PR submitted (2026-07-18)
+
+**https://github.com/JuliaLang/julia/pull/62421** — 5 DCO commits, state
+MERGEABLE at submission. Cover letter follows the evidence-first structure:
+motivation (measured trees), implementation (per-commit), the measurement
+ladder (758 → 601), testing & safety (incl. the control-proven flake and the
+two bugs the safety nets caught), and an RFC section on the stateless
+entry-point class. Nanosoldier benchmark run requested from maintainers in the
+PR body (contributors cannot trigger it). Prior-art search (`gh search`
+issues/prs: "AbstractInterpreter invalidation", "REPLInterpreter
+invalidations", "invalidations REPL compiler") returned no existing work.
+
+Review discipline from here (per contribute.md): address feedback via
+`git commit --amend` / `git rebase -i` keeping the 5-commit structure, then
+`git push --force` to the fork branch — never web-UI merge commits or
+"fix typo" commits.
+
 ## 11. Branch hygiene note
 
 The original branch accidentally tracked local build logs (`git add -A` during

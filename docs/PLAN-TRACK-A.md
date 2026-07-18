@@ -5,6 +5,8 @@
 > **全數清除**，僅剩設計下限（state 建構子 4 個實例）與真正無狀態的入口點。
 > 分支（5 個原子 commit，DCO）：`dennislee928/julia @ avoid-absint-interface-invalidation` @ `9b96794`。
 > 雲端 A/B 對照：`.github/workflows/core-validation.yml` 一鍵輸出 baseline vs patched 改善幅度表。
+> **A4 上游提交完成（2026-07-18）**：PR 已開 → **JuliaLang/julia#62421**（5 commits, MERGEABLE），
+> 官方 CI 進行中；已於內文請求維護者觸發 @nanosoldier。
 > 定位：Track B 已止血（把成本搬走/預付）；本計畫在 core 拔除根源。
 
 ## 0. 依據（已驗證的事實）
