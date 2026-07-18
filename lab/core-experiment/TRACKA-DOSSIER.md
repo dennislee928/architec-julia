@@ -84,6 +84,36 @@ scope (abstractinterpretation.jl ×14, typeinfer.jl ×4). Rebuilt and measured
 - `make test-compiler` on this build: **SUCCESS — 550,209 passed / 0 failed /
   50 known-broken in 8m19s**, including `Compiler/AbstractInterpreter`.
 
+## 9. PR-1 extension + PR-3 implemented and measured (2026-07-18)
+
+Commits `eff8ddf` (cache full `InferenceParams`, consolidating the max_methods
+field) and `1ac0b5b` (cache `InferenceCache`, `cache_owner`, `method_table`;
+swap tfuncs world sites), both DCO-signed. One bootstrap failure caught and
+fixed en route: `get_inference_cache` returns the new `InferenceCache` struct
+on master, not `Vector{InferenceResult}` — the package-context compile check
+does not exercise state construction; only a full bootstrap does.
+
+Measured (`using REPL`, macOS), the full series:
+
+| Build | Unique invalidated | Trees | InferenceParams victims | world victims | inf-cache tree |
+|---|---:|---:|---:|---:|---:|
+| Stock master | 758 | 9 | (large cascades) | ~130 class | present |
+| D1 | 750 | 10 | 0-children leaves | — | present |
+| PR-2 | 751 | 9 | 66 | 19 | 15 victims |
+| **PR-1ext + PR-3** | **648 (−14.5%)** | **8** | **18** | **13** | **eliminated** |
+
+Remaining victims are exactly the documented no-state-in-scope class
+(`find_method_matches` kwarg defaults, `force_const_prop`,
+`abstract_eval_partition_load` with `interp::Union{Nothing,...}`, entry points,
+`types.jl` cache helpers) plus `cache_owner` cross-frame comparison sites —
+each requires either a signature change or acceptance; see
+`docs/tracka-inventory.md`.
+
+**PR-4 resolved by measurement**: `abstract_eval_globalref` tree = **0 victims**
+on this build — per the decision rule in `docs/PLAN-TRACK-A.md` §2.1 (proceed
+only if > 10), adopt Option 3: no code change; record the parameterization
+design in the upstream issue.
+
 ## 1. Measured symptom (this repo's harness)
 
 Loading **any** of CSV / DataFrames / Plots in a fresh Julia 1.12.6 process

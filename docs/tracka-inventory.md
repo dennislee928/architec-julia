@@ -35,8 +35,19 @@
   （`abstract_applicable`、`_hasmethod_tfunc`、`concrete_eval_invoke`、
   `method_table` 等，tfuncs/types 檔）。分支已推上
   `dennislee928/julia@avoid-absint-interface-invalidation` 供 GHA 全量驗證。
-- **A2 PR-3（inf_params/method_table/cache）**：未開始
-- **A2 PR-4（`abstract_eval_globalref` 覆寫類）**：未開始（需設計討論）
+- **A2 PR-1 擴充**：`eff8ddf` ✅ — 快取整個 `inf_params` 欄位（併掉 max_methods 欄位），
+  11 個有 state 的呼叫點改讀 `InferenceParams(sv)`。InferenceParams 樹受害者 66 → **18**。
+- **A2 PR-3**：`1ac0b5b` ✅ — 快取 `InferenceCache`/`cache_owner`/`method_table` 三欄位
+  + tfuncs world 殘餘（`abstract_applicable`/`_hasmethod_tfunc`）。
+  `get_inference_cache` 樹**整棵消失**；world 樹 19 → **13**。
+  教訓：master 的 `get_inference_cache` 回傳新型別 `InferenceCache`（非
+  `Vector{InferenceResult}`）— package-context 編譯檢查不會執行 state 建構，
+  只有完整 bootstrap 才會抓到此類錯誤。
+- **A2 PR-4**：**以量測結案** — 補丁後 `abstract_eval_globalref` 樹 0 受害者，
+  依 PLAN-TRACK-A §2.1 決策規則（>10 才動工）採選項 3：不改碼，
+  參數化設計記入上游 issue。
+- **系列總成效**（`using REPL`，macOS）：**758 → 648 unique invalidated（−14.5%）**，
+  9 → 8 trees；殘餘為無 state 可用的入口類（見 §2 (b) 欄）。
 
 ## 4. 量測指令（重跑本盤點）
 
