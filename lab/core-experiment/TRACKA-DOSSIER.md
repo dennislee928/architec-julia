@@ -49,6 +49,19 @@ Interpretation:
 Branch: `avoid-absint-interface-invalidation` @ `2dbb8d9` (DCO signed) in
 `~/Documents/GitHub/julia`.
 
+## 7. Cloud confirmation (GHA run #2, 2026-07-18)
+
+`.github/workflows/core-validation.yml` on ubuntu-latest, stock
+`JuliaLang/julia@master`, 30m42s: `using DataFrames` invalidates
+**2,364 methods across 56 trees**; the top tree is
+`get_inference_world(::REPLInterpreter)` — the same AbstractInterpreter
+interface class, confirmed cross-OS and via a different trigger package.
+Artifact: `invalidation-report-master`.
+
+**Continuation**: the systematic root-cure plan (inventory → atomic PR series
+extending the D1 pattern to `inf_params`/`world`/`opt_params` → validation
+gates → upstream flow) is specified in [`docs/PLAN-TRACK-A.md`](../../docs/PLAN-TRACK-A.md).
+
 ## 1. Measured symptom (this repo's harness)
 
 Loading **any** of CSV / DataFrames / Plots in a fresh Julia 1.12.6 process

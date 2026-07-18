@@ -11,7 +11,20 @@
 | 限制 WIP（Tree-shaking） | [`lab/small-binary/`](lab/small-binary/) juliac `--trim` | **1.1 MB** 執行檔、130 ms 啟動（對照 sysimage 462 MB） |
 | 品質左移 Poka-Yoke | [`lab/quality-gate/`](lab/quality-gate/) JET + Aqua | 三道閘全綠；曾實際攔截真實 compat 缺陷 |
 | 漸進驗證 + 禁止 Big-Bang | [`lab/ci.sh`](lab/ci.sh) | 靜態 → 單元 → 效能預算，fail-fast 全綠 |
-| 兩軌貢獻 Track B→A | [`plan.md`](plan.md) §4–5 | 4 個具名上游 PR 標的；core 根因已定位（[dossier](lab/core-experiment/TRACKA-DOSSIER.md)） |
+| 兩軌貢獻 Track B→A | [`plan.md`](plan.md) §4–5 | 4 個具名上游 PR 標的；**core 補丁 D1 已實作並驗證**（[dossier](lab/core-experiment/TRACKA-DOSSIER.md)） |
+
+## 結論：治標在套件層，治本在 core（2026-07-18 定論）
+
+| 痛點 | 解在哪裡 | 關鍵證據 |
+|---|---|---|
+| TTFP 冷啟動 | 套件層拿 10× 速贏（成本預付）；**殘餘重工只有 core 能除** | sysimage 7.1s→0.65s；D1 補丁消滅 396-children 級聯，`test-compiler` 539,410 全過 |
+| 記憶體 / 執行檔膨脹 | **Core**（juliac `--trim` 的靜態可達性分析） | 1.1 MB 執行檔 vs PackageCompiler 462 MB 映像 |
+| 缺乏靜態防呆 | 套件層（JET 复用 core 推斷引擎） | 閘門全綠 + 實際攔截缺陷 |
+| 生態系規模 | 只能靠套件層；core 降低貢獻摩擦 | harness + 4 個具名 PR 標的 |
+
+雲端獨立驗證（GHA #2, Linux, stock master）：`using DataFrames` 無效化
+**2,364 methods / 56 trees**，第一名 `get_inference_world(::REPLInterpreter)` —
+與本機 macOS 量測同一根因。**Track A 治本計畫：[`docs/PLAN-TRACK-A.md`](docs/PLAN-TRACK-A.md)**
 
 導覽：
 

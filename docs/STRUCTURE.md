@@ -2,6 +2,8 @@
 
 > 任務脈絡：本文件是 [`plan.md`](../plan.md) Track A（核心貢獻）的背景知識。
 > §2.2 的物件標頭與 §2.3 的排程器，是理解 TTFP 與記憶體（WIP）問題的物理基礎。
+> Track A 治本已開工：源碼樹導覽（特別是 /Compiler）對應
+> [`PLAN-TRACK-A.md`](PLAN-TRACK-A.md) Phase A1 的盤點工作。
 
 ## 2.1 源碼樹總覽 (Source Tree Overview)
 

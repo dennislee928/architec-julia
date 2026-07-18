@@ -99,6 +99,25 @@ Pain-point coverage: TTFP ✅ (sysimage + workloads) · memory/binary bloat ✅ 
 · static-quality ✅ (JET/Aqua gate) · ecosystem ✅ (upstream targets §4 + this repo's
 harness as contribution evidence).
 
+## 4.9 Conclusion (2026-07-18): where each pain point is actually solved
+
+Verdict from the full measurement record (local macOS + GHA Linux):
+**Track B (packages) moves or prepays the cost — the 10× wins available today;
+the root causes live in core and only Track A removes them.**
+
+- TTFP: package layer prepays (sysimage/workloads); the *rework* (invalidation)
+  is core-only — D1 proved the fix pattern works.
+- Memory/binary bloat: core (juliac `--trim` static reachability); package
+  tooling tops out at 462 MB images.
+- Static quality: package layer (JET, built on core's inference engine).
+- Ecosystem: package layer by definition.
+
+Cloud confirmation (GHA run #2, stock master, Linux): `using DataFrames`
+invalidates 2,364 methods / 56 trees; top tree `get_inference_world(::REPLInterpreter)`
+— same root-cause class as local. **The systematic core cure is planned in
+[`docs/PLAN-TRACK-A.md`](docs/PLAN-TRACK-A.md)** (inventory → atomic PR series
+extending the D1 pattern → validation gates → upstream flow).
+
 ## 5a. Phase 3 update (2026-07-18): first core patch built and validated
 
 - Stock master built locally (`1.14.0-DEV`); baseline: `using REPL` invalidates

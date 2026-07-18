@@ -92,5 +92,15 @@ Julia 的 GC 實作位於 `/src/gc.c`。這是一個非精確（Imprecise）、�
 - **漸進驗證 / 禁止 Big-Bang**：`lab/ci.sh` 三階段 fail-fast（靜態 → 單元 →
   TTFX 預算制回歸），品質驗證分散於每個階段邊界。
 - **核心貢獻（Track A）**：§3.4 所述最大無效化樹的根因已定位於
-  `Compiler/src/inferencestate.jl:1312` × `REPLCompletions.jl:535`；
-  候選修法與驗證協定見 [`lab/core-experiment/TRACKA-DOSSIER.md`](../lab/core-experiment/TRACKA-DOSSIER.md)。
+  `Compiler/src/inferencestate.jl:1312` × `REPLCompletions.jl:535`，且
+  **D1 補丁已實作並驗證**（branch `avoid-absint-interface-invalidation`）：
+  `get_max_methods` 受害者消滅、`InferenceParams` 樹級聯歸零、
+  `make test-compiler` 539,410 全數通過。雲端獨立驗證（GHA, Linux, master）：
+  `using DataFrames` 無效化 2,364 methods / 56 trees，第一名
+  `get_inference_world(::REPLInterpreter)` — 同一根因跨平台成立。
+  細節見 [`lab/core-experiment/TRACKA-DOSSIER.md`](../lab/core-experiment/TRACKA-DOSSIER.md)。
+
+**分工定論（2026-07-18）**：本章 §3.1–3.5 的機制分析導出的結論是 —
+套件層對策（§3.6 前五項）只能*搬移或預付*編譯成本；三個痛點的根源
+（無效化重工 §3.4、二進位膨脹 §3.2/3.5、缺乏編譯期保證 §3.1）都內生於
+core，系統性拔除方案見 [`PLAN-TRACK-A.md`](PLAN-TRACK-A.md)。

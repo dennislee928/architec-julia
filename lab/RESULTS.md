@@ -47,12 +47,23 @@ Tree-shaking（死碼消除）將部署體積縮小 3 個數量級 — WIP 上�
 `load=0.275s ttfx=0.11ms`（預算 1.5 s / 5 ms）。品質驗證分散於每一階段，
 不存在末端一次性驗收。
 
-## Track A — 核心貢獻 (`lab/core-experiment/`)
+## Track A — 核心貢獻 (`lab/core-experiment/`)，2026-07-18 更新
 
 - 根因定位：`Compiler/src/inferencestate.jl:1312` 的抽象呼叫點 ×
   `REPL/src/REPLCompletions.jl:535` 的介面擴充 → 編譯器自我無效化
   （最大樹 396 children）。詳見 `TRACKA-DOSSIER.md`。
 - 負面實驗結果（`mechanism.jl`）：stock 1.12 執行期無法重現該 backedge —
   漏洞實例源自 sysimage bootstrap 推斷，驗證必須 rebuild core。
-- 本地 core build 進行中（`~/Documents/GitHub/julia`）；候選修法 D1–D3 與
-  驗證協定已寫入 dossier。
+- **D1 補丁完成整個迴圈**（patch → rebuild → measure → test）：
+  `get_max_methods` 受害者消滅、`InferenceParams` 樹所有殘餘受害者 0 children、
+  `make test-compiler` **539,410 全過**（branch
+  `avoid-absint-interface-invalidation` @ `2dbb8d9`，DCO 簽章）。
+- **雲端獨立驗證**（GHA run #2，ubuntu-latest，stock master，30m42s）：
+  `using DataFrames` 無效化 **2,364 methods / 56 trees**；第一名
+  `get_inference_world(::REPLInterpreter)` — 同一根因，跨 OS、跨觸發套件成立。
+
+## 定論與下一步
+
+治標在套件層（本檔前五節的 10× 速贏 = 成本搬移/預付）；治本在 core
+（無效化重工、二進位膨脹、編譯期保證皆內生於編譯器）。
+系統性治本計畫：[`docs/PLAN-TRACK-A.md`](../docs/PLAN-TRACK-A.md)。

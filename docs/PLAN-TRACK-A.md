@@ -1,0 +1,83 @@
+# Track A 治本計畫 — 系統性消除 AbstractInterpreter 介面無效化
+
+> Status: **DRAFT v1 (2026-07-18)** — 承接 `plan.md` Phase 3 與
+> `lab/core-experiment/TRACKA-DOSSIER.md` 的驗證結果。
+> 定位：Track B 已止血（把成本搬走/預付）；本計畫在 core 拔除根源。
+
+## 0. 依據（已驗證的事實）
+
+| 證據 | 數字 | 來源 |
+|---|---|---|
+| 載入 REPL 使編譯器自我無效化（本機 master, macOS） | 758 methods / 9 trees | 本機 stock build 實測 |
+| 載入 DataFrames（雲端 master, Linux, GHA #2） | **2,364 methods / 56 trees**，第一名 = `get_inference_world(::REPLInterpreter)` | GHA artifact `invalidation-report-master` |
+| D1 補丁（快取 `max_methods`）效果 | `get_max_methods` 受害者**消滅**；`InferenceParams` 樹所有殘餘受害者 **0 children**；`test-compiler` 539,410 全過 | branch `avoid-absint-interface-invalidation` @ `2dbb8d9` |
+| 機制結論 | 漏洞實例只在 sysimage bootstrap 推斷時產生；修法 = 把介面讀取移進「以具體直譯器型別特化」的建構期 | dossier §3、§6 |
+
+**治本原則（從 D1 歸納）**：Compiler 內以抽象型別編譯的程式碼，不得直接呼叫
+可擴充的 AbstractInterpreter 介面函數；介面值應在 state 建構期（具體特化）讀取一次，
+之後從 state 欄位取用。
+
+## 1. Phase A1 — 盤點（1–2 天）
+
+以「量測驅動」列出全部漏洞呼叫點，不靠猜：
+
+1. 從 GHA / 本機的 invalidation trees 萃取所有 mt_backedges 簽名 → 得出被
+   REPL/JET 類套件插入的介面方法全集（已知：`InferenceParams`、
+   `OptimizationParams`、`get_inference_world`、`get_inference_cache`、
+   `cache_owner`、`method_table`、`typeinf_lattice` 家族、
+   `abstract_eval_globalref` 覆寫類）。
+2. `grep` Compiler/src 找出每個介面函數「在抽象編譯路徑上的呼叫點」，
+   分類為：(a) sv 在手邊 → 可讀快取欄位；(b) 只有 interp → 需要傳遞 sv
+   或維持現狀；(c) 建構期呼叫 → 本來就安全。
+3. 產出 `docs/tracka-inventory.md`：呼叫點 × 分類 × 對應無效化樹大小（優先序）。
+
+## 2. Phase A2 — 補丁系列（每個 PR 原子化，依 contribute.md）
+
+依樹大小排序（先大後小），每個 PR 重複 D1 的完整迴圈
+（patch → rebuild → measure → test-compiler）：
+
+| PR | 內容 | 目標樹 |
+|---|---|---|
+| PR-1 | 已完成的 D1（`max_methods`）+ 依審查意見擴充成快取整個 `inf_params::InferenceParams` 欄位，`(a)` 類呼叫點全部改讀欄位 | `InferenceParams` 樹殘餘 |
+| PR-2 | 快取 `world::UInt`（建構期已呼叫 `get_inference_world`！`InferenceState` 其實已有 world 資訊 — 統一從 state 取用） | `get_inference_world` 樹（GHA 第一名） |
+| PR-3 | `opt_params::OptimizationParams` 同樣處理 | `OptimizationParams` 樹 |
+| PR-4 | `abstract_eval_globalref` 類：覆寫型介面（非取值型），評估 D3 函數屏障或 `invoke` 邊界；需要單獨設計討論 | `abstract_eval_globalref` 樹 |
+
+規範：每 PR 一個 commit、DCO 簽章、附 before/after 無效化量測 + `test-compiler`
+結果；PR 描述引用本 repo 的 harness 供審查者重跑。
+
+## 3. Phase A3 — 驗證與效能閘門
+
+1. **功能**：每 PR `make test-compiler`；系列完成後 `make testall` 一次。
+2. **無效化驗收**：`using REPL` 目標 **< 50 methods**（自 758）；
+   GHA `using DataFrames` 目標 **< 500**（自 2,364）— 殘餘應全為與
+   AbstractInterpreter 無關的類別（如 SentinelArrays 整數建構子）。
+3. **效能**：介面值改為建構期讀取 = 語義上「每 state 常數化」。
+   風險：某些 interpreter 動態改變 params？— 現行文件未承諾此行為；PR 中
+   明文化「params/world 在單一 state 生命週期內視為常數」。以
+   BaseBenchmarks 抽樣 + 上游 `@nanosoldier` 把關回歸。
+4. **程式碼尺寸**：state 增加 3 欄位（Int + 2 struct refs）— 可忽略；監看
+   sysimage 尺寸差異 < 0.1%。
+
+## 4. Phase A4 — 上游流程
+
+1. **先搜尋**：JuliaLang/julia issues/PRs 關鍵字 "AbstractInterpreter
+   invalidation" / "REPLInterpreter invalidations" — 若已有 owner，把
+   harness + 量測數據貢獻到該串，D1 branch 作為 draft 供參考。
+2. 無既有工作 → 開 issue 附完整量測（本 repo 連結），提出治本原則，
+   徵求設計回饋後再送 PR-1。
+3. PR 節奏：PR-1 合併並存活一個 release cycle 後再推 PR-2/3；PR-4 獨立設計討論。
+
+## 5. 基礎設施
+
+- **本機**：`~/Documents/GitHub/julia`（增量 rebuild ~25 分鐘/輪）。
+- **雲端**：`.github/workflows/core-validation.yml` — 對 fork branch 全量驗證
+  （~30 分鐘，含 artifact 報告）。注意 julia 預設分支是 `master`。
+- **量測**：本 repo `bench/` + `lab/core-experiment/`，全部可重跑。
+
+## 6. 不做什麼（範圍界線）
+
+- 不動 C++/LLVM 層（本問題整條鏈都在 Julia 寫的 Compiler 內）。
+- 不改 AbstractInterpreter 介面簽名（JET/Cthulhu 等下游不需改動）。
+- 不在本計畫內處理與介面無關的無效化（JSON/SentinelArrays/PrettyTables
+  類 — 那是 plan.md §4 的 Track B 標的）。
