@@ -41,7 +41,30 @@
 | PR-1 | 已完成的 D1（`max_methods`）+ 依審查意見擴充成快取整個 `inf_params::InferenceParams` 欄位，`(a)` 類呼叫點全部改讀欄位 | `InferenceParams` 樹殘餘 |
 | PR-2 | 快取 `world::UInt`（建構期已呼叫 `get_inference_world`！`InferenceState` 其實已有 world 資訊 — 統一從 state 取用） | `get_inference_world` 樹（GHA 第一名） |
 | PR-3 | `opt_params::OptimizationParams` 同樣處理 | `OptimizationParams` 樹 |
-| PR-4 | `abstract_eval_globalref` 類：覆寫型介面（非取值型），評估 D3 函數屏障或 `invoke` 邊界；需要單獨設計討論 | `abstract_eval_globalref` 樹 |
+| PR-4 | `abstract_eval_globalref` 類：覆寫型介面（非取值型）— 設計見 §2.1 | `abstract_eval_globalref` 樹 |
+
+### 2.1 PR-4 設計：覆寫型介面（behavior overrides）
+
+取值型介面（params/world/cache/owner/method table）可用「建構期快取」根治 —
+PR-1/2/3 已證明。覆寫型介面（如 REPLCompletions 覆寫 `abstract_eval_globalref`
+以激進解析 global bindings）不同：插入的方法改變*行為*，快取無適用對象。
+
+候選設計（優先序）：
+
+1. **行為參數化（建議）**：REPLInterpreter 的覆寫本質是「更激進的 binding
+   解析」這一*策略差異*。將策略升格為 `InferenceParams` 欄位（先例：
+   `assume_bindings_static` 已存在），base 實作讀取參數（經 PR-1 的快取欄位，
+   無新增無效化面），REPL 側改為傳參數而非插方法。**方法插入完全消失**。
+   代價：params 欄位增生；僅適用於「策略型」覆寫。
+2. **具體化屏障（D3 精簡版）**：確保 bootstrap 只以具體 `NativeInterpreter`
+   簽名預編譯 `abstract_eval_globalref` 的呼叫者 —— 插入
+   `(::REPLInterpreter, ...)` 方法便不與已編譯簽名相交。需要 bootstrap
+   precompile workload 控制，脆弱且難以長期保證。
+3. **接受現狀**：若量測顯示該樹已縮小（PR-2 後本機 `using REPL` 實測該樹
+   0 victims），列為低優先，僅在上游 issue 中記錄設計選項。
+
+**決策規則**：以 PR-1/2/3 rebuild 後的量測為準 — 樹 victims > 10 才推進
+選項 1；否則採選項 3 並於上游 issue 記錄。
 
 規範：每 PR 一個 commit、DCO 簽章、附 before/after 無效化量測 + `test-compiler`
 結果；PR 描述引用本 repo 的 harness 供審查者重跑。
