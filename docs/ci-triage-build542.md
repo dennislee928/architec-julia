@@ -72,6 +72,22 @@ build（#542）的兩個 status context。Build #542 內 45 steps 只有 2 個 t
    實跑全過（happy path + retry 邏輯路徑）。上游 CI 驗證需開 PR 後由官方
    pipeline 執行。
 
+## PR #62423 CI 進度（2026-07-19 更新）
+
+- **Build #549**（base = master `e332422`）：43/45 綠，`Test` group 2 步失敗
+  （匿名 API 拿不到 job 名稱，無法確認是哪些測試）。
+- **關鍵發現**：上游同日在平行處理同一族 flaky 測試 —
+  [#62422](https://github.com/JuliaLang/julia/pull/62422)（IanButterworth,
+  17:44 UTC merge）直接**刪除** flaky 的 Distributed interrupt testset；
+  vtjnash 在 #62069 討論串表示該測試已被 Keno 弄壞（"Keno just deleted the
+  test there (well, broke it)"）。Build #549 的 base 早於此 merge，其 Test
+  失敗**很可能**（未確證）就是該 testset。
+- **行動**：branch rebase 到 master `2c7d2b1`（含 #62422 removal）→
+  `e49f601`，本機 smoke 重跑全過，force-push 觸發新 build；監控中。
+- 佐證 pipeline 底噪：同期 build 543 也 8 步失敗（無關 PR）、546-548 為其他
+  PR 例行 re-run — julia-pr 紅燈為常態級 flakiness，維護者處理方式即為
+  #62422 這類「修/刪 flaky 測試」PR，與本 PR #62423 同路線。
+
 ### 上游 flaky-test issue 草稿（如決定回報）
 
 > **Title**: Flaky interrupt tests in `test/misc.jl` on Buildkite (macOS x86_64 + i686-linux-gnu)
