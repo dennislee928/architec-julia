@@ -114,6 +114,36 @@ on this build — per the decision rule in `docs/PLAN-TRACK-A.md` §2.1 (proceed
 only if > 10), adopt Option 3: no code change; record the parameterization
 design in the upstream issue.
 
+## 10. Flaky-test control experiment (2026-07-18)
+
+`make test-compiler` on the PR-1ext+PR-3 build hit one failure:
+`Compiler/test/codegen.jl:119` (`test_jl_dump_llvm_opt` — LLVM-opt dump file
+empty). Controlled isolation:
+
+| Build | Standalone repro (10 runs) | Full suite earlier |
+|---|---|---|
+| PR-1ext + PR-3 | 9/10 fail | 1 failure (this test) |
+| **PR-2 control (`2f0ca85`)** | **10/10 fail** | **SUCCESS** (550,209 pass) |
+
+The control build fails the standalone repro *more* often than the patched
+build yet passed the full suite — the failure is a **pre-existing
+nondeterministic race** (LLVM-opt dump vs. JIT pipeline timing), not a
+regression from these commits. Worth reporting upstream as a flaky test with
+this data. All other 550k+ compiler tests pass on the patched builds.
+
+**Final suite run on the clean branch tip (`ac204f8`)**: re-measured 648/8
+(identical), and `make test-compiler` again shows **exactly one failure — the
+same `codegen.jl:119` flaky race**; every other testset passes, including
+`Compiler/AbstractInterpreter` (725 s), inference, inline, and verifytrim.
+
+## 11. Branch hygiene note
+
+The original branch accidentally tracked local build logs (`git add -A` during
+iteration). Recreated clean via per-commit cherry-picks (4 atomic commits, no
+logs) and force-pushed: `dennislee928/julia @ avoid-absint-interface-invalidation`
+= `dafe363` (D1) → `db9be70` (world) → `7ee1204` (inf_params) → `ac204f8`
+(cache/owner/method_table).
+
 ## 1. Measured symptom (this repo's harness)
 
 Loading **any** of CSV / DataFrames / Plots in a fresh Julia 1.12.6 process

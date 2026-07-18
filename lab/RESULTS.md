@@ -67,3 +67,9 @@ Tree-shaking（死碼消除）將部署體積縮小 3 個數量級 — WIP 上�
 治標在套件層（本檔前五節的 10× 速贏 = 成本搬移/預付）；治本在 core
 （無效化重工、二進位膨脹、編譯期保證皆內生於編譯器）。
 系統性治本計畫：[`docs/PLAN-TRACK-A.md`](../docs/PLAN-TRACK-A.md)。
+
+**治本系列執行結果（2026-07-18）**：PR-1/2/3（快取 inf_params / world /
+InferenceCache / cache_owner / method_table）+ PR-4（量測結案）——
+`using REPL` 無效化 **758 → 648（−14.5%）**、9 → 8 trees、
+最熱路徑受害者歸零；`codegen.jl:119` 測試失敗經對照組實驗證明為
+既有非決定性競態，非本系列回歸（dossier §10）。

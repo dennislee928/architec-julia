@@ -118,6 +118,23 @@ invalidates 2,364 methods / 56 trees; top tree `get_inference_world(::REPLInterp
 [`docs/PLAN-TRACK-A.md`](docs/PLAN-TRACK-A.md)** (inventory → atomic PR series
 extending the D1 pattern → validation gates → upstream flow).
 
+## 5a-2. Phase 3 series COMPLETE (2026-07-18 evening): PR-1/2/3 shipped, PR-4 resolved
+
+Full caching series implemented per `docs/PLAN-TRACK-A.md`, each with the
+patch → rebuild → measure → test loop:
+
+- **Series result** (`using REPL`, macOS): **758 → 648 unique invalidated
+  methods (−14.5%)**, 9 → 8 trees; `InferenceParams` victims 66 → 18; world
+  victims → 13; `get_inference_cache` tree eliminated; hottest-path victims
+  (`abstract_call_gf_by_type` etc.) zero.
+- **PR-4** resolved by measurement (0 victims < 10 threshold) — design recorded,
+  no code needed.
+- One suite failure investigated with a control build: `codegen.jl:119`
+  LLVM-dump test is a pre-existing nondeterministic race (control @ PR-2 fails
+  10/10 standalone yet passed the suite) — not a regression; upstream-reportable.
+- Clean branch (4 atomic DCO commits, logs scrubbed):
+  `dennislee928/julia @ avoid-absint-interface-invalidation`.
+
 ## 5a. Phase 3 update (2026-07-18): first core patch built and validated
 
 - Stock master built locally (`1.14.0-DEV`); baseline: `using REPL` invalidates

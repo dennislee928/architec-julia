@@ -1,7 +1,9 @@
 # Track A 治本計畫 — 系統性消除 AbstractInterpreter 介面無效化
 
-> Status: **DRAFT v1 (2026-07-18)** — 承接 `plan.md` Phase 3 與
-> `lab/core-experiment/TRACKA-DOSSIER.md` 的驗證結果。
+> Status: **A1–A2 EXECUTED (2026-07-18)** — PR-1/2/3 實作並量測完畢、PR-4 以量測結案。
+> 系列總成效：`using REPL` 無效化 **758 → 648（−14.5%）**；最熱路徑受害者歸零。
+> 分支（4 個原子 commit，DCO）：`dennislee928/julia @ avoid-absint-interface-invalidation`。
+> 殘餘 = 無 state 可用的入口類呼叫點（詳 `tracka-inventory.md` §2 (b)）→ A4 上游討論題。
 > 定位：Track B 已止血（把成本搬走/預付）；本計畫在 core 拔除根源。
 
 ## 0. 依據（已驗證的事實）
@@ -38,10 +40,10 @@
 
 | PR | 內容 | 目標樹 |
 |---|---|---|
-| PR-1 | 已完成的 D1（`max_methods`）+ 依審查意見擴充成快取整個 `inf_params::InferenceParams` 欄位，`(a)` 類呼叫點全部改讀欄位 | `InferenceParams` 樹殘餘 |
-| PR-2 | 快取 `world::UInt`（建構期已呼叫 `get_inference_world`！`InferenceState` 其實已有 world 資訊 — 統一從 state 取用） | `get_inference_world` 樹（GHA 第一名） |
-| PR-3 | `opt_params::OptimizationParams` 同樣處理 | `OptimizationParams` 樹 |
-| PR-4 | `abstract_eval_globalref` 類：覆寫型介面（非取值型）— 設計見 §2.1 | `abstract_eval_globalref` 樹 |
+| PR-1 | ✅ **完成** `7ee1204`：快取整個 `inf_params::InferenceParams` 欄位（併掉 D1 的 max_methods 欄位），有 state 的呼叫點改讀 `InferenceParams(sv)`；樹受害者 66 → 18 | `InferenceParams` 樹殘餘 |
+| PR-2 | ✅ **完成** `db9be70`：快取 `world::UInt` + `get_inference_world(sv::AbsIntState)`，18 呼叫點；最熱受害者（`abstract_call_gf_by_type` 等）歸零 | `get_inference_world` 樹（GHA 第一名） |
+| PR-3 | ✅ **完成** `ac204f8`：快取 `InferenceCache`/`cache_owner`/`method_table` + tfuncs world 殘餘；`get_inference_cache` 樹整棵消失 | cache/owner/method_table 樹 |
+| PR-4 | ✅ **以量測結案**（選項 3）：補丁後該樹 0 受害者，未達 >10 動工門檻；參數化設計保留於 §2.1 供上游 issue | `abstract_eval_globalref` 樹 |
 
 ### 2.1 PR-4 設計：覆寫型介面（behavior overrides）
 
