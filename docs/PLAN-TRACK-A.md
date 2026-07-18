@@ -45,6 +45,25 @@
 | PR-3 | ✅ **完成** `ac204f8`：快取 `InferenceCache`/`cache_owner`/`method_table` + tfuncs world 殘餘；`get_inference_cache` 樹整棵消失 | cache/owner/method_table 樹 |
 | PR-4 | ✅ **以量測結案**（選項 3）：補丁後該樹 0 受害者，未達 >10 動工門檻；參數化設計保留於 §2.1 供上游 issue | `abstract_eval_globalref` 樹 |
 
+### 2.0 PR-5 設計：無狀態呼叫點的「傳遞 state」重構（2026-07-18 新增）
+
+PR-1/2/3 後的殘餘直接受害者精確普查（`using REPL`，三棵介面樹合計 ~41 個）：
+
+| 受害者 | 數量 | 修法 |
+|---|---:|---|
+| `edge_matches_sv` | 10 | 呼叫端有當前 sv：把 interp 參數改為當前 state，`cache_owner(interp)`/`InferenceParams(interp)` → `(sv)` |
+| `builtin_tfunction` | 5 | `sv::Union{AbsIntState,Nothing}` → **拆成兩個方法**：`sv::AbsIntState` 走快取（熱路徑乾淨），`::Nothing` 保留介面呼叫（入口罕用） |
+| `var"#..."` 閉包 | 4 | 逐一辨識所屬函數後套用同法 |
+| `concrete_eval_invoke` | 3 | 檢查簽名是否帶 irinterp state → 換讀快取 |
+| `force_const_prop` | 2 | 內部函數：加 `sv` 參數（呼叫端皆有 sv） |
+| `find_method_matches` | 2 | kwarg 預設值讀介面 → 加 sv 參數、預設值改 `InferenceParams(sv)` |
+| `abstract_eval_partition_load` | 2 | `interp::Union{Nothing,...}` → 改傳 `assume_bindings_static::Bool`（有 sv 的呼叫端從快取取值） |
+| `is_same_frame` / `code_cache` / `engine_reserve` / `method_table` | 4 | 有 caller 的改讀快取；`code_cache(sv)`、`engine_reserve(mi, cache_owner(sv))` |
+| `InferenceState` / `IRInterpretationState` 建構子 | 4 | **設計上不可消除**（建構期唯一一次介面讀取 = 本模式的成本下限） |
+
+原則：這一輪允許改**內部**函數簽名（傳遞 state），但仍不動 AbstractInterpreter
+公開介面。目標：`using REPL` 直接受害者僅剩建構子類（≤ 8），unique total 顯著下降。
+
 ### 2.1 PR-4 設計：覆寫型介面（behavior overrides）
 
 取值型介面（params/world/cache/owner/method table）可用「建構期快取」根治 —
