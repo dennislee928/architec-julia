@@ -50,8 +50,8 @@ build（#542）的兩個 status context。Build #542 內 45 steps 只有 2 個 t
 |---|---|
 | 改本分支程式碼 | ❌ 無東西可改；失敗與分支無關 |
 | Retry Buildkite job | ⚠️ 技術上可（Buildkite「Retry」按鈕），但 PR 已關閉，重跑無合併意義 |
-| **修 flaky test 本身**（上游測試補強） | ✅ **已完成**：branch `harden-interrupt-tests` @ `40ffec6`（off master），見下節 |
-| 上游回報 flaky test issue | 可與 fix PR 合併為一個提交；屬對外動作，由本人決定是否送出 |
+| **修 flaky test 本身**（上游測試補強） | ✅ **已完成並提交上游**：branch `harden-interrupt-tests` @ `40ffec6` → **[JuliaLang/julia#62423](https://github.com/JuliaLang/julia/pull/62423)**（2026-07-18），見下節 |
+| 上游回報 flaky test issue | ✅ 以 fix PR #62423 形式回報（內含 build 542 失敗證據與連結） |
 
 ## 修補內容（`harden-interrupt-tests` @ `40ffec6`，`test/misc.jl` +54/−26）
 
