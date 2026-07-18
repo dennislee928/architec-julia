@@ -174,6 +174,25 @@ merge vs. the pre-fix measure comes from `concrete_eval_eligible` folding in).
 Branch tip: `9b96794` on `dennislee928/julia @ avoid-absint-interface-invalidation`
 (5 atomic DCO commits).
 
+## 14. Cloud A/B confirmation (run 29633027464, 2026-07-18)
+
+First full A/B run of `core-validation.yml` v2 (ubuntu-latest, both sides
+built from source in one run), measuring the branch at its 4-commit tip
+(`ac204f8`):
+
+| Metric | Baseline master | Patched | Improvement |
+|---|---:|---:|---:|
+| `using REPL` methods | 758 | 648 | 14.5% |
+| `using REPL` trees | 10 | 8 | 20.0% |
+| `using DataFrames` methods | 2309 | 2199 | 4.8% |
+| `using DataFrames` trees | 57 | 55 | 3.5% |
+
+The Linux baseline (758) matches macOS exactly — the measurement is
+platform-stable. Posted to the PR as
+https://github.com/JuliaLang/julia/pull/62421#issuecomment-5010242026 ;
+a re-run against the 5-commit tip (`9b96794`, local: 601) is in flight
+(run 29634087325).
+
 ## 13. Upstream PR submitted (2026-07-18)
 
 **https://github.com/JuliaLang/julia/pull/62421** — 5 DCO commits, state
