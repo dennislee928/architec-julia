@@ -84,6 +84,14 @@ build（#542）的兩個 status context。Build #542 內 45 steps 只有 2 個 t
   失敗**很可能**（未確證）就是該 testset。
 - **行動**：branch rebase 到 master `2c7d2b1`（含 #62422 removal）→
   `e49f601`，本機 smoke 重跑全過，force-push 觸發新 build；監控中。
+- **Build #551 結果（2026-07-19，rebase 後）**：✅ **Test group 全平台通過**
+  （2h41m）— 含 build 542 原本失敗的 i686-linux-gnu 與 x86_64-apple-darwin。
+  **本次 goal 所指的 CI 失敗（misc.jl interrupt 測試）已修復並經上游官方 CI 驗證。**
+  唯一紅燈 = JuliaC step「Errored」（agent error，非測試失敗）；同 step 在
+  build 549（相同 diff）通過，且本 PR 只動 `test/misc.jl`，與 JuliaC 無關 —
+  已在 PR 留言請維護者 retry 該 step
+  （[comment](https://github.com/JuliaLang/julia/pull/62423#issuecomment-5012961602)）。
+  後續（merge 與否）為維護者權限。
 - 佐證 pipeline 底噪：同期 build 543 也 8 步失敗（無關 PR）、546-548 為其他
   PR 例行 re-run — julia-pr 紅燈為常態級 flakiness，維護者處理方式即為
   #62422 這類「修/刪 flaky 測試」PR，與本 PR #62423 同路線。
