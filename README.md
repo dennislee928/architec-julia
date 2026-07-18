@@ -26,11 +26,12 @@
 **2,364 methods / 56 trees**，第一名 `get_inference_world(::REPLInterpreter)` —
 與本機 macOS 量測同一根因。
 
-**治本已執行（2026-07-18）**：[`docs/PLAN-TRACK-A.md`](docs/PLAN-TRACK-A.md) 的
-PR-1/2/3 快取系列實作完畢、PR-4 以量測結案 —— `using REPL` 無效化
-**758 → 648（−14.5%）**、最熱推斷路徑受害者歸零、`get_inference_cache` 樹整棵消失；
-4 個原子 DCO commit 在 `dennislee928/julia @ avoid-absint-interface-invalidation`。
-盤點與逐 PR 量測：[`docs/tracka-inventory.md`](docs/tracka-inventory.md)
+**治本已執行（2026-07-18，含 PR-5）**：[`docs/PLAN-TRACK-A.md`](docs/PLAN-TRACK-A.md)
+全系列（快取 + 無狀態殘餘重構）完畢 —— `using REPL` 無效化 **758 → 601（−20.7%）**、
+可消除的介面樹受害者**全數清除**（僅剩建構子設計下限與真入口點）；
+5 個原子 DCO commit 在 `dennislee928/julia @ avoid-absint-interface-invalidation`。
+盤點與逐 PR 量測：[`docs/tracka-inventory.md`](docs/tracka-inventory.md)。
+雲端 A/B 對照與 release 管線：[`.github/workflows/`](.github/workflows/)
 
 導覽：
 

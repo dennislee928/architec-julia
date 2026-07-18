@@ -156,9 +156,23 @@ Eliminating those would require redesigning the AbstractInterpreter entry
 contract itself — that is the upstream design conversation, now with a
 complete measurement ladder as evidence.
 
-Lesson: callsites passing the function *by reference*
-(`scan_leaf_partitions(abstract_eval_partition_load, …)`) are invisible to
-paren-suffixed greps; the bootstrap MethodError caught it.
+Lessons from this round (both caught by the safety nets, not by review):
+
+1. Callsites passing the function *by reference*
+   (`scan_leaf_partitions(abstract_eval_partition_load, …)`) are invisible to
+   paren-suffixed greps — the bootstrap MethodError caught it.
+2. **`code_cache(interp)` is itself an overridable interface method**: the
+   first PR-5 draft reimplemented its default from cached fields, silently
+   bypassing custom interpreters' overrides — `Compiler/test/AbstractInterpreter.jl`'s
+   ephemeral-cache test failed (a real regression, distinct from the flake).
+   Fix: cache the interface's *result* at construction (`code_cache::Any`
+   field), like every other cached value. Suite green afterward (only the
+   known `codegen.jl:119` flake remains).
+
+Final numbers on the fixed build: **601 methods / 7 trees** (the extra tree
+merge vs. the pre-fix measure comes from `concrete_eval_eligible` folding in).
+Branch tip: `9b96794` on `dennislee928/julia @ avoid-absint-interface-invalidation`
+(5 atomic DCO commits).
 
 ## 11. Branch hygiene note
 

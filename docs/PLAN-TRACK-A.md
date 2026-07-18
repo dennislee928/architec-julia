@@ -1,9 +1,10 @@
 # Track A 治本計畫 — 系統性消除 AbstractInterpreter 介面無效化
 
-> Status: **A1–A2 EXECUTED (2026-07-18)** — PR-1/2/3 實作並量測完畢、PR-4 以量測結案。
-> 系列總成效：`using REPL` 無效化 **758 → 648（−14.5%）**；最熱路徑受害者歸零。
-> 分支（4 個原子 commit，DCO）：`dennislee928/julia @ avoid-absint-interface-invalidation`。
-> 殘餘 = 無 state 可用的入口類呼叫點（詳 `tracka-inventory.md` §2 (b)）→ A4 上游討論題。
+> Status: **A1–A2 FULLY EXECUTED incl. PR-5 (2026-07-18)** — 快取系列 + 無狀態殘餘重構完畢。
+> 系列總成效：`using REPL` 無效化 **758 → 601（−20.7%）**；可消除的介面樹受害者
+> **全數清除**，僅剩設計下限（state 建構子 4 個實例）與真正無狀態的入口點。
+> 分支（5 個原子 commit，DCO）：`dennislee928/julia @ avoid-absint-interface-invalidation` @ `9b96794`。
+> 雲端 A/B 對照：`.github/workflows/core-validation.yml` 一鍵輸出 baseline vs patched 改善幅度表。
 > 定位：Track B 已止血（把成本搬走/預付）；本計畫在 core 拔除根源。
 
 ## 0. 依據（已驗證的事實）
