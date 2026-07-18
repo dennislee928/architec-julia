@@ -1,37 +1,51 @@
-# Track A 雲端驗證管線 — 在 GitHub Actions 上編譯（可能帶補丁的）Julia core，
-# 並量測「載入 DataFrames 觸發的方法無效化」，與本地基線比對。
+# Track A 雲端 A/B 驗證管線 — 同一次 run 內建置「原版 julia」與「本專案補丁版」，
+# 量測方法無效化（using REPL / using DataFrames），並直接輸出改善幅度對照表
+# （GitHub Actions run summary + artifact）。
 #
-# 用法：把本 repo 推上 GitHub 後，於 Actions 頁面手動觸發（workflow_dispatch），
-# 指定要驗證的 julia repo（你的 fork）與 branch/ref。
-# Julia 完整編譯在 ubuntu-latest 約 1.5–2.5 小時，仍在 6 小時上限內；
-# 本地 Apple Silicon `make -j8` 約 40–90 分鐘 — 短迭代用本地，長驗證用這裡。
+# 觸發：Actions 頁面手動（workflow_dispatch）。兩個 build job 並行（各 ~1.5–2.5 h），
+# compare job 匯總。注意：julia 預設分支是 `master`，不是 `main`。
 name: core-invalidation-validation
 
 on:
   workflow_dispatch:
     inputs:
-      julia_repo:
-        description: "Julia repo to build (e.g. your fork: username/julia)"
+      baseline_repo:
+        description: "Baseline julia repo"
         required: true
         default: "JuliaLang/julia"
-      julia_ref:
-        description: "Branch/ref to build — NOTE: julia's default branch is `master`, not `main`"
+      baseline_ref:
+        description: "Baseline ref (julia's default branch is `master`)"
         required: true
         default: "master"
+      patched_repo:
+        description: "Patched julia repo (this project's fork)"
+        required: true
+        default: "dennislee928/julia"
+      patched_ref:
+        description: "Patched ref (the invalidation-caching series)"
+        required: true
+        default: "avoid-absint-interface-invalidation"
 
 jobs:
-  build-and-measure:
+  build-measure:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - side: baseline
+            repo: ${{ inputs.baseline_repo }}
+            ref: ${{ inputs.baseline_ref }}
+          - side: patched
+            repo: ${{ inputs.patched_repo }}
+            ref: ${{ inputs.patched_ref }}
     runs-on: ubuntu-latest
     timeout-minutes: 350
     steps:
       - name: Validate repo/ref before the expensive part (fail fast)
         run: |
-          if ! git ls-remote --exit-code "https://github.com/${{ inputs.julia_repo }}" \
-              "refs/heads/${{ inputs.julia_ref }}" "refs/tags/${{ inputs.julia_ref }}"; then
-            echo "::error::ref '${{ inputs.julia_ref }}' not found on ${{ inputs.julia_repo }}."
-            echo "::error::julia's default branch is 'master' (not 'main'); for a fork pass your feature branch name."
-            echo "Available heads (first 20):"
-            git ls-remote --heads "https://github.com/${{ inputs.julia_repo }}" | head -20
+          if ! git ls-remote --exit-code "https://github.com/${{ matrix.repo }}" \
+              "refs/heads/${{ matrix.ref }}" "refs/tags/${{ matrix.ref }}"; then
+            echo "::error::ref '${{ matrix.ref }}' not found on ${{ matrix.repo }} (julia's default branch is 'master')."
             exit 1
           fi
 
@@ -40,11 +54,11 @@ jobs:
           sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
           df -h /
 
-      - name: Checkout Julia source
+      - name: Checkout Julia source (${{ matrix.side }})
         uses: actions/checkout@v4
         with:
-          repository: ${{ inputs.julia_repo }}
-          ref: ${{ inputs.julia_ref }}
+          repository: ${{ matrix.repo }}
+          ref: ${{ matrix.ref }}
           path: julia
 
       - name: Install build dependencies
@@ -56,28 +70,95 @@ jobs:
         working-directory: julia
         run: make -j"$(nproc)"
 
-      - name: Measure invalidations on package load
+      - name: Measure invalidations (REPL + DataFrames)
         working-directory: julia
         run: |
           ./usr/bin/julia --startup-file=no -e '
             using Pkg
             Pkg.activate(; temp=true)
             Pkg.add(["SnoopCompileCore", "SnoopCompile", "DataFrames"])
-            using SnoopCompileCore
-            invs = @snoop_invalidations @eval using DataFrames
-            using SnoopCompile
-            trees = invalidation_trees(invs)
-            open("../invalidation-report.txt", "w") do io
-                println(io, "unique invalidated methods: ", length(uinvalidated(invs)))
-                println(io, "invalidation trees: ", length(trees))
-                for t in trees[max(1, end - 9):end]
-                    show(io, t); println(io, "\n", "-"^70)
+            function measure(pkg::String)
+                # each measurement in a fresh process for clean JIT state
+                script = """
+                    using Pkg; Pkg.activate(\"$(Base.active_project())\"; io=devnull)
+                    using SnoopCompileCore
+                    invs = @snoop_invalidations @eval using $pkg
+                    using SnoopCompile
+                    trees = invalidation_trees(invs)
+                    println(\"METRIC \", length(uinvalidated(invs)), \" \", length(trees))
+                    for t in trees[max(1, end - 4):end]
+                        show(stdout, t); println(\"\\n\", \"-\"^70)
+                    end
+                """
+                io = IOBuffer()
+                run(pipeline(`$(Base.julia_cmd()) --startup-file=no -e $script`; stdout=io, stderr=devnull))
+                out = String(take!(io))
+                m = match(r"METRIC (\d+) (\d+)", out)
+                return (parse(Int, m.captures[1]), parse(Int, m.captures[2]), out)
+            end
+            open("../metrics-${{ matrix.side }}.env", "w") do env
+                open("../report-${{ matrix.side }}.txt", "w") do rep
+                    for pkg in ("REPL", "DataFrames")
+                        (n, t, out) = measure(pkg)
+                        println(env, lowercase(pkg), "_unique=", n)
+                        println(env, lowercase(pkg), "_trees=", t)
+                        println(rep, "===== using ", pkg, " =====\n", out)
+                    end
                 end
             end
-            println(read("../invalidation-report.txt", String))'
+            println(read("../metrics-${{ matrix.side }}.env", String))'
 
-      - name: Upload report
+      - name: Upload measurement
         uses: actions/upload-artifact@v4
         with:
-          name: invalidation-report-${{ inputs.julia_ref }}
-          path: invalidation-report.txt
+          name: invalidation-${{ matrix.side }}
+          path: |
+            metrics-${{ matrix.side }}.env
+            report-${{ matrix.side }}.txt
+
+  compare:
+    needs: build-measure
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download both measurements
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - name: Compute and publish the enhancement degree
+        run: |
+          python3 - <<'EOF'
+          def load(side):
+              d = {}
+              for line in open(f"metrics-{side}.env"):
+                  k, v = line.strip().split("=")
+                  d[k] = int(v)
+              return d
+          b, p = load("baseline"), load("patched")
+          lines = [
+              "# Invalidation A/B: baseline vs patched",
+              "",
+              "| Metric | Baseline (${{ inputs.baseline_repo }}@${{ inputs.baseline_ref }}) | Patched (${{ inputs.patched_repo }}@${{ inputs.patched_ref }}) | Δ | Improvement |",
+              "|---|---:|---:|---:|---:|",
+          ]
+          for key, label in [("repl_unique", "`using REPL` invalidated methods"),
+                             ("repl_trees", "`using REPL` invalidation trees"),
+                             ("dataframes_unique", "`using DataFrames` invalidated methods"),
+                             ("dataframes_trees", "`using DataFrames` invalidation trees")]:
+              delta = p[key] - b[key]
+              pct = (100.0 * delta / b[key]) if b[key] else 0.0
+              lines.append(f"| {label} | {b[key]} | {p[key]} | {delta:+d} | {-pct:.1f}% |")
+          lines += ["", "Full per-side tree dumps are in the `invalidation-baseline` / `invalidation-patched` artifacts."]
+          report = "\n".join(lines)
+          print(report)
+          open("comparison.md", "w").write(report + "\n")
+          import os
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as f:
+              f.write(report + "\n")
+          EOF
+
+      - name: Upload comparison
+        uses: actions/upload-artifact@v4
+        with:
+          name: invalidation-comparison
+          path: comparison.md
