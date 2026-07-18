@@ -1,0 +1,91 @@
+# Release pipeline — 精實出貨：發佈前跑完整品質閘門（漸進驗證，禁止 Big-Bang），
+# 再打包可交付工件並建立 GitHub Release。
+#
+# 觸發：推 tag `v*`，或 Actions 頁面手動（workflow_dispatch 需給 tag 名）。
+# 工件：
+#   - architec-julia-docs-<tag>.tar.gz — 全部報告/計畫/基準結果
+#   - hello-linux-x86_64            — juliac --trim 的 1-MB 級示範執行檔（WIP 上限實證）
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g. v0.1.0); must exist or will be created at HEAD"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  quality-gate-and-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Julia 1.12
+        uses: julia-actions/setup-julia@v2
+        with:
+          version: "1.12"
+
+      - name: Re-develop local environments (Manifests carry machine-local paths)
+        run: |
+          julia --startup-file=no --project=lab/LeanDemo -e 'using Pkg; Pkg.instantiate()'
+          julia --startup-file=no --project=lab/quality-gate -e '
+            using Pkg
+            Pkg.develop(path="lab/LeanDemo")
+            Pkg.add(["JET", "Aqua"])
+            Pkg.instantiate()'
+
+      - name: "Stage 1/3 — shift-left quality gate (JET + Aqua)"
+        run: |
+          julia --startup-file=no --project=lab/quality-gate lab/quality-gate/gate.jl \
+            | tee gate.out | grep -E "^G[123]|QUALITY_GATE"
+          grep -q QUALITY_GATE_PASS gate.out
+
+      - name: "Stage 2/3 — unit tests"
+        run: julia --startup-file=no --project=lab/LeanDemo -e 'using Pkg; Pkg.test()'
+
+      - name: "Stage 3/3 — TTFX regression budget"
+        run: |
+          julia --startup-file=no --project=lab/LeanDemo -e '
+            t_load = @elapsed using LeanDemo
+            t1 = @elapsed summarize([1.0, 2.0, 3.0])
+            t2 = @elapsed rolling_mean([1.0, 2.0, 3.0, 4.0], 2)
+            println("load=$(round(t_load, digits=3))s ttfx=$(round((t1 + t2) * 1000, digits=2))ms")
+            (t_load <= 3.0 && (t1 + t2) <= 0.010) || (println("PERF FAIL"); exit(1))
+            println("PERF PASS")'
+
+      - name: Build trimmed demo binary (juliac --trim)
+        run: |
+          SHARE="$(julia --startup-file=no -e 'print(Sys.BINDIR)')/../share/julia"
+          julia --startup-file=no "$SHARE/juliac/juliac.jl" \
+            --output-exe hello-linux-x86_64 --experimental --trim=safe lab/small-binary/hello.jl
+          ls -lh hello-linux-x86_64
+          ./hello-linux-x86_64
+
+      - name: Package docs and results bundle
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          tar czf "architec-julia-docs-$TAG.tar.gz" \
+            README.md plan.md docs/ bench/results/ \
+            lab/RESULTS.md lab/core-experiment/TRACKA-DOSSIER.md
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          generate_release_notes: true
+          body: |
+            精實出貨：本 release 已通過三段品質閘門（JET/Aqua 靜態分析 → 單元測試 →
+            TTFX 效能預算）。附件含全部報告與 juliac `--trim` 示範執行檔。
+            Core 補丁系列（invalidation caching）：見 `docs/PLAN-TRACK-A.md` 與
+            `lab/core-experiment/TRACKA-DOSSIER.md`。
+          files: |
+            architec-julia-docs-${{ env.TAG }}.tar.gz
+            hello-linux-x86_64
