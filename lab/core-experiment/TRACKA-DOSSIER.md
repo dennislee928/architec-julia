@@ -62,6 +62,28 @@ Artifact: `invalidation-report-master`.
 extending the D1 pattern to `inf_params`/`world`/`opt_params` → validation
 gates → upstream flow) is specified in [`docs/PLAN-TRACK-A.md`](../../docs/PLAN-TRACK-A.md).
 
+## 8. PR-2 implemented and measured (2026-07-18)
+
+Commit `2f0ca85` (DCO): cache `world::UInt` in both inference states; add
+`get_inference_world(sv::AbsIntState)`; swap the 18 callsites with a state in
+scope (abstractinterpretation.jl ×14, typeinfer.jl ×4). Rebuilt and measured
+(`using REPL`, macOS):
+
+- world tree direct victims: **`abstract_call_gf_by_type` 0 (was 76 on the GHA
+  stock report), `abstract_invoke` 0, `return_cached_result` 0**.
+- 19 surviving victims = exactly the un-swapped entry-point class
+  (`abstract_applicable`, `_hasmethod_tfunc`, `concrete_eval_invoke`,
+  `method_table`, ctor instances) — PR-3 scope per
+  [`docs/tracka-inventory.md`](../../docs/tracka-inventory.md).
+- Remaining large tree: `InferenceParams` 66 victims (other field reads → PR-1
+  extension); new small trees visible: `get_inference_cache` 15, `cache_owner` 6.
+- Branch pushed to `dennislee928/julia @ avoid-absint-interface-invalidation` —
+  run the GHA workflow with `julia_repo: dennislee928/julia`,
+  `julia_ref: avoid-absint-interface-invalidation` for the cloud before/after
+  vs stock's 2,364/56.
+- `make test-compiler` on this build: **SUCCESS — 550,209 passed / 0 failed /
+  50 known-broken in 8m19s**, including `Compiler/AbstractInterpreter`.
+
 ## 1. Measured symptom (this repo's harness)
 
 Loading **any** of CSV / DataFrames / Plots in a fresh Julia 1.12.6 process

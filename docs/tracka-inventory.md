@@ -28,8 +28,13 @@
 - **A1 盤點**：本文件 ✅（由實測樹 + grep 產出，非猜測）
 - **A2 PR-1（D1）**：`2dbb8d9` ✅ — `get_max_methods` 受害者消滅、級聯歸零、
   `test-compiler` 539,410 全過
-- **A2 PR-2（world）**：`2f0ca85` — 18 呼叫點改讀 `get_inference_world(sv::AbsIntState)`
-  快取欄位；rebuild + 量測進行中
+- **A2 PR-2（world）**：`2f0ca85` ✅ — 18 呼叫點改讀
+  `get_inference_world(sv::AbsIntState)` 快取欄位。rebuild 後實測（`using REPL`）：
+  world 樹的 `abstract_call_gf_by_type` / `abstract_invoke` / `return_cached_result`
+  受害者**全數歸零**；殘餘 19 個受害者恰為未換的 (b) 類入口
+  （`abstract_applicable`、`_hasmethod_tfunc`、`concrete_eval_invoke`、
+  `method_table` 等，tfuncs/types 檔）。分支已推上
+  `dennislee928/julia@avoid-absint-interface-invalidation` 供 GHA 全量驗證。
 - **A2 PR-3（inf_params/method_table/cache）**：未開始
 - **A2 PR-4（`abstract_eval_globalref` 覆寫類）**：未開始（需設計討論）
 
